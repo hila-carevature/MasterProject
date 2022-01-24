@@ -138,4 +138,4 @@ src/HapticDevicePipe/PipeDevice/x64/*
 src/HapticDevicePipe/.vs
 
 # Images
-.jpg
+*.jpg
