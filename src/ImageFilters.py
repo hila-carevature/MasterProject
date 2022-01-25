@@ -4,12 +4,12 @@
 # finding hsv range of target object(pen)
 import cv2
 import numpy as np
-import time
+
 
 VIDEO = 0
 IMAGE = 1
 INPUT_TYPE = IMAGE
-IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame1.jpg'
+IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame975.jpg'
 HSV = 0
 RGB = 1
 FILTER_TYPE = HSV

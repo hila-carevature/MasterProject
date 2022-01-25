@@ -1,6 +1,22 @@
-RGB:
-bone (in white)
+HSV
 
-frame100
-[[180, 0, 0], [255, 255, 255]]
+HSV color Hue value:
+yellow/orange: 0-25
+green: 56-64
+blue: 90-124
+red: 170-179
+
+
+HSV: (filters of purely tissue color, w/o bloody area -> trial to be independent on light saturation & value)
+bone (red/white "clean part of bone"): Hue 174-179 
+
+dura (gray-blue "clean part of dura"): Hue 126-166
+
+surrounding soft tissue/cavities (dark areas): S 245-255
+
+
+
+frame1:
+bone: Value 163-255 (inverse of this)
+dura: Hue 0-169, Sat 39-255, Value 0-149(since more opaque, with less blood -> reflects less light & is less saturated -> filter out high Value & low Saturation)
 
