@@ -82,7 +82,6 @@ def image_processing(image):
 
 '''-------------------------------Region Growing--------------------------------------------------------'''
 
-
 # Region growing
 def homogeneity_criterion(int_1, int_2, img_type):
     # return if the homogenity criterion is respected between the two pixels
@@ -208,8 +207,8 @@ def merge_regions(labeled_pxl, nb_labels, img):
         for j in range(i + 1, len(merged_label_list)):
             if eucl_distance(obj_center[i], obj_center[j]) < DISTANCE_THRESH:
                 print('merge', i)
-                merged_labeled_pxl[merged_labeled_pxl == merged_label_list[i]] = merged_label_list[i]
-                merged_labeled_pxl[merged_labeled_pxl == merged_label_list[j]] = merged_label_list[i]
+                merged_labeled_pxl[labeled_pxl == merged_label_list[i]] = merged_label_list[i]
+                merged_labeled_pxl[labeled_pxl == merged_label_list[j]] = merged_label_list[i]
                 merged_label_list[j] = merged_label_list[i]
     print('finished merging')
     return merged_labeled_pxl, np.unique(merged_label_list)
