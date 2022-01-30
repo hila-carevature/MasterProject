@@ -17,15 +17,15 @@ DURA_UPPER_RANGE = np.array([166, 255, 255])    # np.array([169, 255, 149])
 KERNEL_MORPH = np.ones((21, 21), np.uint8)      # kernel for morphology close & open
 
 IMG_COLOR = 1
-IMG_GREY = 0
+IMG_GRAY = 0
 HOMOGENEITY_THRESHOLD = 0.7
-MIN_SIZE_REGION = 10
+MIN_SIZE_REGION = 300
 MAX_SIZE_REGION = 10000
 REGION_LABELS_FILE = 'labels.npy'
 REGION_NB_LABELS_FILE = 'nb_labels.npy'
 REGION_MERGED_LABEL_PXL_FILE = 'merged_labels.npy'
 REGION_MERGED_LABELS_FILE = 'merged_label_list.npy'
-DISTANCE_THRESH = 15                            # maximum distance between objects for merging
+DISTANCE_THRESH = 20                            # maximum distance between objects for merging
 
 
 def exit_programme():
@@ -71,21 +71,22 @@ def image_processing(image):
     # Combine the two images == combine masks
     bone_n_dura = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_or(bone_mask, dura_mask))
 
-    # show images of bone & dura
-    bone = cv2.bitwise_and(frame, frame, mask=bone_mask)
-    dura = cv2.bitwise_and(frame, frame, mask=dura_mask)
-    stacked = np.hstack((bone, dura))
-    cv2.imshow('bone, dura', cv2.resize(stacked, None, fx=0.4, fy=0.4))
-    cv2.waitKey(0)
+    # # show images of bone & dura
+    # bone = cv2.bitwise_and(frame, frame, mask=bone_mask)
+    # dura = cv2.bitwise_and(frame, frame, mask=dura_mask)
+    # stacked = np.hstack((bone, dura))
+    # cv2.imshow('bone, dura', cv2.resize(stacked, None, fx=0.4, fy=0.4))
+    # cv2.waitKey(0)
     return bone_n_dura
 
 
 '''-------------------------------Region Growing--------------------------------------------------------'''
 
+
 # Region growing
 def homogeneity_criterion(int_1, int_2, img_type):
     # return if the homogenity criterion is respected between the two pixels
-    if img_type == IMG_GREY:
+    if img_type == IMG_GRAY:
         if int_1 < (HOMOGENEITY_THRESHOLD + int_2) and int_2 < (HOMOGENEITY_THRESHOLD + int_1):
             return True
         else:
@@ -101,19 +102,19 @@ def homogeneity_criterion(int_1, int_2, img_type):
 
 def in_range(x, y, size_x, size_y):
     # return if the pixel is in the range of the image
-    return x < size_x and x >= 0 and y < size_y and y >= 0
+    return size_x > x >= 0 and size_y > y >= 0
 
 
-def check_and_add_neighbours(im, x, y, current_label, counter, labels, queueList, IMG_TYPE):
-    SIZE_X, SIZE_Y = im.shape[0:2]
+def check_and_add_neighbours(im, x, y, current_label, counter, labels, queue_list, img_type):
+    size_x, size_y = im.shape[0:2]
     # for each neighbour, if he respects the homogeneity criterion and has not already a label, add it to the queue list
     for i, j in zip([-1, 0, 0, 1, -1, 1, -1, 1], [0, 1, -1, 0, -1, 1, 1, -1]):
         xb = x + i
         yb = y + j
-        if in_range(xb, yb, SIZE_X, SIZE_Y) and labels[xb, yb] == -1 and homogeneity_criterion(im[x, y], im[xb, yb],
-                                                                                               IMG_TYPE):
+        if in_range(xb, yb, size_x, size_y) and labels[xb, yb] == -1 and homogeneity_criterion(im[x, y], im[xb, yb],
+                                                                                               img_type):
             labels[xb, yb] = current_label
-            queueList.append([xb, yb])
+            queue_list.append([xb, yb])
             counter = counter + 1
     return counter
 
@@ -121,21 +122,21 @@ def check_and_add_neighbours(im, x, y, current_label, counter, labels, queueList
 def region_growing(image, img_type):
     print('started region growing')
     # proceeds to region growing on the entire image
-    SIZE_X, SIZE_Y = image.shape[0:2]
+    size_x, size_y = image.shape[0:2]
     # Init of variables
     queue_list = []
-    labels = np.ones((SIZE_X, SIZE_Y), int) * (-1)
+    labels = np.ones((size_x, size_y), int) * (-1)
     current_point_x = -1  # because we will start by incrementing the point x
     current_point_y = 0
     current_label = 0  # note that first label will be 1
     counter = 0
 
     # Main loop
-    while counter != SIZE_X * SIZE_Y:  # while we didn't check all the points on the image
+    while counter != size_x * size_y:  # while we didn't check all the points on the image
         # Update current point position and check if we reached the end
-        if current_point_x < SIZE_X - 1:
+        if current_point_x < size_x - 1:
             current_point_x = current_point_x + 1
-        elif current_point_y < SIZE_Y - 1:
+        elif current_point_y < size_y - 1:
             current_point_x = 0
             current_point_y = current_point_y + 1
 
@@ -177,36 +178,28 @@ def merge_regions(labeled_pxl, nb_labels, img):
     print('started merging')
     # Join regions that are close to each other.
     # Find the labels of large-area objects (saved in big_label_list) & their center position
-    big_label_list = []  # list of labels of large objects
-    obj_center = []  # list of center positions of large objects
-    for current_label in range(1, nb_labels + 1):
-        # find number of pixels in object
-        mask_region = cv2.inRange(labeled_pxl, current_label, current_label)
+
+    # remove small objects from label_list
+    labels_list, label_pxl_count = np.unique(labeled_pxl, return_counts=True)             # 2D array [label, nb_pixel w/ label]
+    # delete label corresponding to small object
+    small_pxl_label_id = np.concatenate((np.where(MIN_SIZE_REGION > label_pxl_count)[0], np.where(label_pxl_count > MAX_SIZE_REGION)[0]))
+    big_label_list = np.delete(labels_list, small_pxl_label_id)
+
+    obj_center = []
+    # compute object centers for each object
+    for current_label in big_label_list:
+        mask_region = cv2.inRange(labeled_pxl, int(current_label), int(current_label))
         pxl_coords, area = find_region_coords(mask_region, img.shape[:2])
+        obj_center.append(np.mean(pxl_coords, 0).astype(int))
 
-        if MIN_SIZE_REGION < area < MAX_SIZE_REGION:
-            big_label_list.append(current_label)
-            obj_center.append(np.mean(pxl_coords, 0).astype(int))
-        # nb_pxl = np.count_nonzero(mask_region)
-
-        print('big', current_label)
-        # ignore small objects to reduce computation time & ignore noise
-        # if MIN_SIZE_REGION < nb_pxl < MAX_SIZE_REGION:
-        #     pxl_coords, area = find_region_coords(mask_region, img.shape[:2])
-        #     big_label_list.append(current_label)
-        #     obj_center.append(np.mean(pxl_coords, 0).astype(int))
-    print('finished large regions')
     # merging objects close to each other
     merged_label_list = np.copy(big_label_list)
-    # merged_labeled_pxl = np.copy(labeled_pxl)
-    merged_labeled_pxl = np.zeros(labeled_pxl.shape[:2])
-    # merged_labeled_pxl = np.ones(img.shape[:2])* (-1)
+    merged_labeled_pxl = np.copy(labeled_pxl)
 
     # go through large objects label list. For objects close to each other, label their corresponding pixels with the same label
     for i in range(len(merged_label_list) - 1):
         for j in range(i + 1, len(merged_label_list)):
             if eucl_distance(obj_center[i], obj_center[j]) < DISTANCE_THRESH:
-                print('merge', i)
                 merged_labeled_pxl[labeled_pxl == merged_label_list[i]] = merged_label_list[i]
                 merged_labeled_pxl[labeled_pxl == merged_label_list[j]] = merged_label_list[i]
                 merged_label_list[j] = merged_label_list[i]
@@ -214,16 +207,15 @@ def merge_regions(labeled_pxl, nb_labels, img):
     return merged_labeled_pxl, np.unique(merged_label_list)
 
 
-def apply_growing(img, img_type):
+def apply_growing_n_merge(img, img_type):
     # UNCOMMENT to compute region growing
-    # # do region growing to label each region in final image]
-    # # on HSV image
+    # do region growing to label each region in final image]
+    # on HSV image
     # [labeled_pxl, nb_labels] = region_growing(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), img_type)
-    # # [labeled_pxl, nb_labels] = region_growing(img, img_type)
-    # print(nb_labels)
-    # np.save(REGION_LABELS_FILE, labeled_pxl)
-    # np.save(REGION_NB_LABELS_FILE, nb_labels)
-    # # exit_programme()
+    [labeled_pxl, nb_labels] = region_growing(img, img_type)
+    np.save(REGION_LABELS_FILE, labeled_pxl)
+    np.save(REGION_NB_LABELS_FILE, nb_labels)
+    # exit_programme()
 
     # load region growing arrays
     labeled_pxl = np.load(REGION_LABELS_FILE)
@@ -239,34 +231,26 @@ def apply_growing(img, img_type):
     # load merged regions
     merged_labeled_pxl = np.load(REGION_MERGED_LABEL_PXL_FILE)
     merged_label_list = np.load(REGION_MERGED_LABELS_FILE)
-
     # display regions with large area
-    for current_label in merged_label_list:
+    mask_region = cv2.inRange(merged_labeled_pxl, int(merged_label_list[0]), int(merged_label_list[0]))
+    for current_label in merged_label_list[1:]:         # start from 2nd element
         # choose one region
-        print('label', current_label)
-        mask_region = cv2.inRange(merged_labeled_pxl, int(current_label), int(current_label))
-        print('nb pxls', np.count_nonzero(mask_region))
-        region = cv2.bitwise_and(img, img, mask=mask_region)
-        cv2.imshow('region', region)
-        key1 = cv2.waitKey(0)
-        # if press escape key
-        if key1 == 27:
-            break
+        current_mask_region = cv2.inRange(merged_labeled_pxl, int(current_label), int(current_label))
+        mask_region = cv2.bitwise_or(mask_region, current_mask_region)
+        # mask_region = cv2.bitwise_and(img, img, mask=cv2.bitwise_or(mask_region, current_mask_region))
+        # print('nb pxls', np.count_nonzero(mask_region))
+        # region = cv2.bitwise_and(img, img, mask=mask_region)
+        # cv2.imshow('region', region)
+        # key1 = cv2.waitKey(0)
+        # # if press escape key
+        # if key1 == 27:
+        #     break
         #
-        # # cv2.imshow('mask', mask_region)
-        # # nb_pxl = sum(sum(mask_region))
-        # nb_pxl = np.count_nonzero(mask_region)
-        #
-        # if MIN_SIZE_REGION < nb_pxl < MAX_SIZE_REGION:
-        #     print('label', l, 'nb pxl', nb_pxl)
-        #     # create image of region
-        #     region = cv2.bitwise_and(img, img, mask=mask_region)
-        #     # region = img[mask_region]
-        #     cv2.imshow('region', region)
-        #     key1 = cv2.waitKey(0)
-        #     # if press escape key
-        #     if key1 == 27:
-        #         break
+    return mask_region
+    # region = cv2.bitwise_and(img, img, mask=mask_region)
+    # cv2.imshow('region', region)
+    # cv2.waitKey(0)
+
 
 '''
 # Preprocessing steps: examples
@@ -299,11 +283,14 @@ if MEDIA_TYPE == 'image':
     # load image
     frame = cv2.imread(MEDIA_PATH)
     frame_masked = image_processing(frame)
-    # cv2.imshow('masked', cv2.resize(frame_masked, None, fx=0.6, fy=0.6))
-    # cv2.waitKey(0)
+    cv2.imshow('frame_masked', cv2.resize(frame_masked, None, fx=0.6, fy=0.6))
+    cv2.waitKey(0)
 
     # region growing
-    apply_growing(frame, IMG_COLOR)
+    mask = apply_growing_n_merge(cv2.cvtColor(frame_masked, cv2.COLOR_BGR2HSV), IMG_COLOR)
+    frame_grown = cv2.bitwise_and(frame, frame, mask=mask)
+    cv2.imshow('frame_grown', frame_grown)
+    cv2.waitKey(0)
 
 elif MEDIA_TYPE == 'video':
     # Load video:
