@@ -16,7 +16,18 @@ surrounding soft tissue/cavities (dark areas): S 245-255
 
 
 
-frame1:
+Millgram, Foraminotomy - short, frame1:
 bone: Value 163-255 (inverse of this)
 dura: Hue 0-169, Sat 39-255, Value 0-149(since more opaque, with less blood -> reflects less light & is less saturated -> filter out high Value & low Saturation)
 
+Millgram, swab wonder:
+bone: Hue 0-7 OR 211-255
+Dura: Hue 127-170
+Bone-dura area: Sat 230-255
+
+
+
+
+
+RGB:
+bone: 200, 120, 130 

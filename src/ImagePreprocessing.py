@@ -7,6 +7,7 @@ import skimage.measure
 
 MEDIA_TYPE = 'image'                            # 'image' or 'video'
 MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame1_cropped.jpg'
+# MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
 # MEDIA_TYPE = 'video'                          # 'image' or 'video'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
 # Filters in HSV
@@ -16,6 +17,9 @@ DURA_LOWER_RANGE = np.array([126, 0, 0])        # np.array([0, 39, 0])
 DURA_UPPER_RANGE = np.array([166, 255, 255])    # np.array([169, 255, 149])
 KERNEL_MORPH = np.ones((21, 21), np.uint8)      # kernel for morphology close & open
 
+IS_REGION_GROWING = True                       # boolean if to apply region growing or not
+IS_REDO_GROWING = True
+IS_REDO_MERGING = True
 IMG_COLOR = 1
 IMG_GRAY = 0
 HOMOGENEITY_THRESHOLD = 0.7
@@ -95,6 +99,8 @@ def homogeneity_criterion(int_1, int_2, img_type):
         int_val_1 = math.sqrt(int_1[2] ** 2 + int_1[1] ** 2 + int_1[0] ** 2)
         int_val_2 = math.sqrt(int_2[2] ** 2 + int_2[1] ** 2 + int_2[0] ** 2)
         if int_val_1 < (HOMOGENEITY_THRESHOLD + int_val_2) and int_val_2 < (HOMOGENEITY_THRESHOLD + int_val_1):
+        # # only based on Hue value
+        # if int_1[0] < (HOMOGENEITY_THRESHOLD + int_2[0]) and int_2[0] < (HOMOGENEITY_THRESHOLD + int_1[0]):
             return True
         else:
             return False
@@ -208,30 +214,29 @@ def merge_regions(labeled_pxl, nb_labels, img):
 
 
 def apply_growing_n_merge(img, img_type):
-    # UNCOMMENT to compute region growing
-    # do region growing to label each region in final image]
-    # on HSV image
-    # [labeled_pxl, nb_labels] = region_growing(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), img_type)
-    [labeled_pxl, nb_labels] = region_growing(img, img_type)
-    np.save(REGION_LABELS_FILE, labeled_pxl)
-    np.save(REGION_NB_LABELS_FILE, nb_labels)
-    # exit_programme()
+    if IS_REDO_GROWING:
+        # UNCOMMENT to compute region growing
+        # do region growing to label each region in final image]
+        # on HSV image
+        # [labeled_pxl, nb_labels] = region_growing(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), img_type)
+        [labeled_pxl, nb_labels] = region_growing(img, img_type)
+        np.save(REGION_LABELS_FILE, labeled_pxl)
+        np.save(REGION_NB_LABELS_FILE, nb_labels)
+        # exit_programme()
+    else:
+        # load region growing arrays
+        labeled_pxl = np.load(REGION_LABELS_FILE)
+        nb_labels = np.load(REGION_NB_LABELS_FILE)
+    if IS_REDO_MERGING:
+        merged_labeled_pxl, merged_label_list = merge_regions(labeled_pxl, nb_labels, img)
+        np.save(REGION_MERGED_LABEL_PXL_FILE, merged_labeled_pxl)
+        np.save(REGION_MERGED_LABELS_FILE, merged_label_list)
+    else:
+        # load merged regions
+        merged_labeled_pxl = np.load(REGION_MERGED_LABEL_PXL_FILE)
+        merged_label_list = np.load(REGION_MERGED_LABELS_FILE)
 
-    # load region growing arrays
-    labeled_pxl = np.load(REGION_LABELS_FILE)
-    nb_labels = np.load(REGION_NB_LABELS_FILE)
-    # cv2.imshow('img', img)
-    # key1 = cv2.waitKey(0)
-
-    merged_labeled_pxl, merged_label_list = merge_regions(labeled_pxl, nb_labels, img)
-    np.save(REGION_MERGED_LABEL_PXL_FILE, merged_labeled_pxl)
-    np.save(REGION_MERGED_LABELS_FILE, merged_label_list)
-    # exit_programme()
-
-    # load merged regions
-    merged_labeled_pxl = np.load(REGION_MERGED_LABEL_PXL_FILE)
-    merged_label_list = np.load(REGION_MERGED_LABELS_FILE)
-    # display regions with large area
+    # combine masks of all objects into one
     mask_region = cv2.inRange(merged_labeled_pxl, int(merged_label_list[0]), int(merged_label_list[0]))
     for current_label in merged_label_list[1:]:         # start from 2nd element
         # choose one region
@@ -283,14 +288,17 @@ if MEDIA_TYPE == 'image':
     # load image
     frame = cv2.imread(MEDIA_PATH)
     frame_masked = image_processing(frame)
-    cv2.imshow('frame_masked', cv2.resize(frame_masked, None, fx=0.6, fy=0.6))
+    img = np.copy(frame_masked)
+    cv2.imshow('frame', cv2.resize(img, None, fx=0.6, fy=0.6))
     cv2.waitKey(0)
 
-    # region growing
-    mask = apply_growing_n_merge(cv2.cvtColor(frame_masked, cv2.COLOR_BGR2HSV), IMG_COLOR)
-    frame_grown = cv2.bitwise_and(frame, frame, mask=mask)
-    cv2.imshow('frame_grown', frame_grown)
-    cv2.waitKey(0)
+    if IS_REGION_GROWING:
+        # region growing
+        mask = apply_growing_n_merge(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), IMG_COLOR)
+        frame_grown = cv2.bitwise_and(frame, frame, mask=mask)
+        # frame_grown = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_not(mask))
+        cv2.imshow('frame_grown', cv2.resize(frame_grown, None, fx=0.6, fy=0.6))
+        cv2.waitKey(0)
 
 elif MEDIA_TYPE == 'video':
     # Load video:
