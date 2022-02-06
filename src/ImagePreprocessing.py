@@ -4,12 +4,21 @@ import numpy as np
 import math
 import skimage.io
 import skimage.measure
+import os
 
 # MEDIA_TYPE = 'image'                            # 'image' or 'video'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame1_cropped.jpg'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
+
 MEDIA_TYPE = 'video'                          # 'image' or 'video'
-MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
+# MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
+# VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram'
+# VIDEO_OUT_NAME = 'Foraminotomy - short - out HSV-coloured.avi'
+MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy.mp4'
+VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan'
+VIDEO_OUT_NAME = 'Foraminotomy - out HSV-coloured.avi'
+
+
 # Filters in HSV
 BONE_LOWER_RANGE = np.array([0, 0, 163])        # np.array([0, 0, 0])
 BONE_UPPER_RANGE = np.array([179, 255, 255])    # np.array([179, 255, 175])
@@ -63,7 +72,7 @@ def image_processing(image):
     """
     Finds regions with bone & dura, computes their corresponding masks and returns an image with the dura & bone regions
     :param image: in BGR
-    :return: masked image
+    :return: masked image, colored image(original image with overlaying colored masks)
     """
     # Convert the BGR image to HSV image.
     hsv_frame = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -72,16 +81,20 @@ def image_processing(image):
     bone_mask = find_mask(hsv_frame, BONE_LOWER_RANGE, BONE_UPPER_RANGE, False, KERNEL_MORPH)
     dura_mask = find_mask(hsv_frame, DURA_LOWER_RANGE, DURA_UPPER_RANGE, False, KERNEL_MORPH)
 
+    # create color image
+    colored_bone = (0, 255, 50) * np.ones(image.shape)
+    colored_dura = (255, 0, 0) * np.ones(image.shape)
+    # convert masks into colored masks
+    colored_bone = cv2.bitwise_and(colored_bone, colored_bone, mask=bone_mask)
+    colored_dura = cv2.bitwise_and(colored_dura, colored_dura, mask=dura_mask)
+
+    combined_image = cv2.addWeighted(image, 0.8, np.asarray(colored_bone, image.dtype), 0.5, 0)
+    combined_image = cv2.addWeighted(combined_image, 0.8, np.asarray(colored_dura, image.dtype), 0.5, 0)
+
     # Combine the two images == combine masks
     bone_n_dura = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_or(bone_mask, dura_mask))
 
-    # # show images of bone & dura
-    # bone = cv2.bitwise_and(frame, frame, mask=bone_mask)
-    # dura = cv2.bitwise_and(frame, frame, mask=dura_mask)
-    # stacked = np.hstack((bone, dura))
-    # cv2.imshow('bone, dura', cv2.resize(stacked, None, fx=0.4, fy=0.4))
-    # cv2.waitKey(0)
-    return bone_n_dura
+    return bone_n_dura, combined_image
 
 
 '''-------------------------------Region Growing--------------------------------------------------------'''
@@ -288,8 +301,9 @@ cv2.waitKey(0)
 if MEDIA_TYPE == 'image':
     # load image
     frame = cv2.imread(MEDIA_PATH)
-    frame_masked = image_processing(frame)
-    img = np.copy(frame_masked)
+    frame_masked, colored_frame = image_processing(frame)
+
+    img = np.copy(colored_frame)
     cv2.imshow('frame', cv2.resize(img, None, fx=0.6, fy=0.6))
     cv2.waitKey(0)
 
@@ -304,17 +318,33 @@ if MEDIA_TYPE == 'image':
 elif MEDIA_TYPE == 'video':
     # Load video:
     cap = cv2.VideoCapture(MEDIA_PATH)
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
+
+    # create directory for saving images: if it doesn't already exists
+    try:
+        os.makedirs(VIDEO_OUT_PATH)
+    except OSError:
+        pass
+
+    out = cv2.VideoWriter(os.path.join(VIDEO_OUT_PATH, VIDEO_OUT_NAME), cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 2, (frame_width, frame_height))
     while cap.isOpened():
         print('Cap Open')
         ret, frame = cap.read()
         if ret:
-            frame_masked = image_processing(frame)
-            cv2.imshow('masked', cv2.resize(frame_masked, None, fx=0.6, fy=0.6))
-            key = cv2.waitKey(0)
-            # if press escape key
-            if key == 27:
-                break
+            frame_masked, colored_frame = image_processing(frame)
+            # cv2.imshow('masked', cv2.resize(colored_frame, None, fx=0.6, fy=0.6))
+            # key = cv2.waitKey(0)
+            # # if press escape key
+            # if key == 27:
+            #     cap.release()
+            #     out.release()
+            #     break
+            # save filtered frame in video
+            out.write(colored_frame)  # to store the video
         else:
+            cap.release()
+            out.release()
             break
-
+print('finished')
 cv2.destroyAllWindows()

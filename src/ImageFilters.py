@@ -9,8 +9,8 @@ import numpy as np
 VIDEO = 0
 IMAGE = 1
 INPUT_TYPE = IMAGE
-IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame975.jpg'
-# IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy/cropped/frame1476_cropped.jpg'
+# IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame975.jpg'
+IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/FOV comparison/frame5954_cropped.jpg'
 HSV = 0
 RGB = 1
 FILTER_TYPE = HSV
@@ -24,7 +24,7 @@ def nothing(x):
 # main:
 cap = 0
 frame = 0
-resize_scale = 0.6  # percent of original size
+resize_scale = 0.8  # percent of original size
 if INPUT_TYPE == VIDEO:
     # Initializing the webcam feed.
     cap = cv2.VideoCapture(0)
