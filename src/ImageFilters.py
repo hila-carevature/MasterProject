@@ -9,8 +9,8 @@ import numpy as np
 VIDEO = 0
 IMAGE = 1
 INPUT_TYPE = IMAGE
-# IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame975.jpg'
-IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
+IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame975.jpg'
+# IMAGE_PATH ='../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy/cropped/frame1476_cropped.jpg'
 HSV = 0
 RGB = 1
 FILTER_TYPE = HSV
@@ -24,6 +24,7 @@ def nothing(x):
 # main:
 cap = 0
 frame = 0
+resize_scale = 0.6  # percent of original size
 if INPUT_TYPE == VIDEO:
     # Initializing the webcam feed.
     cap = cv2.VideoCapture(0)
@@ -32,7 +33,7 @@ if INPUT_TYPE == VIDEO:
 elif INPUT_TYPE == IMAGE:
     frame = cv2.imread(IMAGE_PATH)
     # resize image
-    resize_scale = 0.6  # percent of original size
+    # resize_scale = 0.6  # percent of original size
     width = int(frame.shape[1] * resize_scale)
     height = int(frame.shape[0] * resize_scale)
     dim = (width, height)
@@ -41,19 +42,20 @@ else:
     print('input media type unexpected')
     exit()
 # Create a window named trackbars.
-cv2.namedWindow("Trackbars")
+# cv2.namedWindow("Trackbars")
+cv2.namedWindow(IMAGE_PATH)
 
 # Now create 6 trackbars that will control the lower and upper range of
 # H,S and V channels. The Arguments are like this: Name of trackbar,
 # window name, range,callback function. For Hue the range is 0-179 and
 # for S,V its 0-255.
 if FILTER_TYPE == HSV:
-    cv2.createTrackbar("L - H", "Trackbars", 0, 179, nothing)
-    cv2.createTrackbar("L - S", "Trackbars", 0, 255, nothing)
-    cv2.createTrackbar("L - V", "Trackbars", 0, 255, nothing)
-    cv2.createTrackbar("U - H", "Trackbars", 179, 179, nothing)
-    cv2.createTrackbar("U - S", "Trackbars", 255, 255, nothing)
-    cv2.createTrackbar("U - V", "Trackbars", 255, 255, nothing)
+    cv2.createTrackbar("L - H", IMAGE_PATH, 0, 179, nothing)
+    cv2.createTrackbar("L - S", IMAGE_PATH, 0, 255, nothing)
+    cv2.createTrackbar("L - V", IMAGE_PATH, 0, 255, nothing)
+    cv2.createTrackbar("U - H", IMAGE_PATH, 179, 179, nothing)
+    cv2.createTrackbar("U - S", IMAGE_PATH, 255, 255, nothing)
+    cv2.createTrackbar("U - V", IMAGE_PATH, 255, 255, nothing)
 else:
     cv2.createTrackbar("L - R", "Trackbars", 0, 255, nothing)
     cv2.createTrackbar("L - G", "Trackbars", 0, 255, nothing)
@@ -83,12 +85,12 @@ while True:
 
         # Get the new values of the trackbar in real time as the user changes
         # them
-        l_h = cv2.getTrackbarPos("L - H", "Trackbars")
-        l_s = cv2.getTrackbarPos("L - S", "Trackbars")
-        l_v = cv2.getTrackbarPos("L - V", "Trackbars")
-        u_h = cv2.getTrackbarPos("U - H", "Trackbars")
-        u_s = cv2.getTrackbarPos("U - S", "Trackbars")
-        u_v = cv2.getTrackbarPos("U - V", "Trackbars")
+        l_h = cv2.getTrackbarPos("L - H", IMAGE_PATH)
+        l_s = cv2.getTrackbarPos("L - S", IMAGE_PATH)
+        l_v = cv2.getTrackbarPos("L - V", IMAGE_PATH)
+        u_h = cv2.getTrackbarPos("U - H", IMAGE_PATH)
+        u_s = cv2.getTrackbarPos("U - S", IMAGE_PATH)
+        u_v = cv2.getTrackbarPos("U - V", IMAGE_PATH)
 
         # Set the lower and upper HSV range according to the value selected
         # by the trackbar
@@ -124,7 +126,7 @@ while True:
     stacked = np.hstack((mask_3, original_frame, res))
 
     # Show this stacked frame at 40% of the size.
-    cv2.imshow('Trackbars', cv2.resize(stacked, None, fx=0.4, fy=0.4))
+    cv2.imshow(IMAGE_PATH, cv2.resize(stacked, None, fx=resize_scale, fy=resize_scale))
 
     # If the user presses ESC then exit the program
     key = cv2.waitKey(1)

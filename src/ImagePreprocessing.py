@@ -5,11 +5,11 @@ import math
 import skimage.io
 import skimage.measure
 
-MEDIA_TYPE = 'image'                            # 'image' or 'video'
-MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame1_cropped.jpg'
+# MEDIA_TYPE = 'image'                            # 'image' or 'video'
+# MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame1_cropped.jpg'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
-# MEDIA_TYPE = 'video'                          # 'image' or 'video'
-# MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
+MEDIA_TYPE = 'video'                          # 'image' or 'video'
+MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
 # Filters in HSV
 BONE_LOWER_RANGE = np.array([0, 0, 163])        # np.array([0, 0, 0])
 BONE_UPPER_RANGE = np.array([179, 255, 255])    # np.array([179, 255, 175])
@@ -17,9 +17,9 @@ DURA_LOWER_RANGE = np.array([126, 0, 0])        # np.array([0, 39, 0])
 DURA_UPPER_RANGE = np.array([166, 255, 255])    # np.array([169, 255, 149])
 KERNEL_MORPH = np.ones((21, 21), np.uint8)      # kernel for morphology close & open
 
-IS_REGION_GROWING = True                       # boolean if to apply region growing or not
-IS_REDO_GROWING = True
-IS_REDO_MERGING = True
+IS_REGION_GROWING = False                       # boolean if to apply region growing or not
+IS_REDO_GROWING = False
+IS_REDO_MERGING = False
 IMG_COLOR = 1
 IMG_GRAY = 0
 HOMOGENEITY_THRESHOLD = 0.7
@@ -282,6 +282,7 @@ cv2.waitKey(0)
 cv2.imshow('closed', frame_closed)
 cv2.waitKey(0)
 '''
+'''-------------------------------Main code--------------------------------------------------------'''
 
 # main programme
 if MEDIA_TYPE == 'image':
