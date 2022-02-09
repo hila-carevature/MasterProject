@@ -7,7 +7,7 @@ import skimage.measure
 import os
 
 MEDIA_TYPE = 'image'                            # 'image' or 'video'
-MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame1.jpg'
+MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame142.jpg'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
 
 # MEDIA_TYPE = 'video'                          # 'image' or 'video'
@@ -27,13 +27,13 @@ DURA_UPPER_RANGE = np.array([166, 255, 255])    # np.array([169, 255, 149])
 KERNEL_MORPH = np.ones((21, 21), np.uint8)      # kernel for morphology close & open
 # HSV_MAX = np.asarray((179, 255, 255))
 
-IS_REGION_GROWING = True                       # boolean if to apply region growing or not
-IS_REDO_GROWING = True
-IS_REDO_MERGING = True
+IS_REGION_GROWING = False                       # boolean if to apply region growing or not
+IS_REDO_GROWING = False
+IS_REDO_MERGING = False
 IMG_COLOR = 1
 IMG_GRAY = 0
 HOMOGENEITY_THRESHOLD = 0.75
-MIN_SIZE_REGION = 500
+MIN_SIZE_REGION = 50
 MAX_SIZE_REGION = 10000
 REGION_LABELS_FILE = 'labels.npy'
 REGION_NB_LABELS_FILE = 'nb_labels.npy'
@@ -242,6 +242,10 @@ def merge_regions(labeled_pxl, nb_labels, img):
 
 
 def apply_growing_n_merge(img, img_type):
+    cv2.imshow('input image', img)
+    cv2.waitKey(0)
+
+    # apply region growing & merging of close regions together
     if IS_REDO_GROWING:
         # UNCOMMENT to compute region growing
         # do region growing to label each region in final image]
@@ -265,6 +269,20 @@ def apply_growing_n_merge(img, img_type):
         merged_labeled_pxl = np.load(REGION_MERGED_LABEL_PXL_FILE)
         merged_label_list = np.load(REGION_MERGED_LABELS_FILE)
 
+    # display each label
+
+    for current_label in np.unique(labeled_pxl):
+        current_mask_region = cv2.inRange(labeled_pxl, int(current_label), int(current_label))
+        nb_pxl = np.count_nonzero(current_mask_region)
+        print('nb pxls', nb_pxl)
+        if nb_pxl > MIN_SIZE_REGION:
+            region = cv2.bitwise_and(img, img, mask=current_mask_region)
+            cv2.imshow('region', region)
+            key1 = cv2.waitKey(0)
+            # if press escape key
+            if key1 == 27:
+                break
+
     # combine masks of all objects into one
     mask_region = cv2.inRange(merged_labeled_pxl, int(merged_label_list[0]), int(merged_label_list[0]))
     for current_label in merged_label_list[1:]:         # start from 2nd element
@@ -284,6 +302,27 @@ def apply_growing_n_merge(img, img_type):
     # region = cv2.bitwise_and(img, img, mask=mask_region)
     # cv2.imshow('region', region)
     # cv2.waitKey(0)
+
+
+'''-------------------------------Canny filter--------------------------------------------------------'''
+
+
+def canny_filter(img):
+    img_blur = cv2.GaussianBlur(img, (5, 5), 0)
+    v = np.median(img_blur)
+    lower = int(max(0, (1.0 - 0.33) * v))
+    upper = int(min(255, (1.0 + 0.33) * v))
+
+    # cv2.imshow('input image', cv2.resize(img, None, fx=0.6, fy=0.6))
+    cv2.imshow('blurred image', cv2.resize(img, None, fx=0.8, fy=0.8))
+
+    # frame_edges = cv2.Canny(img_blur, lower, upper, 3)
+    frame_edges = cv2.Canny(img_blur, 10, 50)
+    print('lower', lower)
+    print('upper', upper)
+    cv2.imshow('canny', cv2.resize(frame_edges, None, fx=0.8, fy=0.8))
+    cv2.waitKey(0)
+    return
 
 
 '''
@@ -323,8 +362,14 @@ if MEDIA_TYPE == 'image':
     frame = cv2.imread(MEDIA_PATH)
     frame_masked, colored_frame = image_processing(frame)
 
+    # canny_filter(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+    canny_filter(frame[:, :, 1])
+    # cv2.imwrite('../res/surgery_images/frame52GreenChannel.jpg', frame[:, :, 1])
+
     if IS_REGION_GROWING:
         # region growing
+        # frame = frame[:, :, 1]
+        # mask = apply_growing_n_merge(frame, IMG_GRAY)
         mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
         # mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), IMG_COLOR)
         frame_grown = cv2.bitwise_and(frame, frame, mask=mask)
