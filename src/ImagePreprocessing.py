@@ -6,17 +6,17 @@ import skimage.io
 import skimage.measure
 import os
 
-# MEDIA_TYPE = 'image'                            # 'image' or 'video'
-# MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/frame1_cropped.jpg'
+MEDIA_TYPE = 'image'                            # 'image' or 'video'
+MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame1.jpg'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
 
-MEDIA_TYPE = 'video'                          # 'image' or 'video'
+# MEDIA_TYPE = 'video'                          # 'image' or 'video'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
-# VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram'
-# VIDEO_OUT_NAME = 'Foraminotomy - short - out HSV-coloured.avi'
-MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy.mp4'
-VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan'
-VIDEO_OUT_NAME = 'Foraminotomy - out HSV-coloured.avi'
+VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram'
+VIDEO_OUT_NAME = 'Foraminotomy - short - out HSV-growing_coloured.avi'
+# MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy.mp4'
+# VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan'
+# VIDEO_OUT_NAME = 'Foraminotomy - out HSV-coloured.avi'
 
 
 # Filters in HSV
@@ -25,14 +25,15 @@ BONE_UPPER_RANGE = np.array([179, 255, 255])    # np.array([179, 255, 175])
 DURA_LOWER_RANGE = np.array([126, 0, 0])        # np.array([0, 39, 0])
 DURA_UPPER_RANGE = np.array([166, 255, 255])    # np.array([169, 255, 149])
 KERNEL_MORPH = np.ones((21, 21), np.uint8)      # kernel for morphology close & open
+# HSV_MAX = np.asarray((179, 255, 255))
 
-IS_REGION_GROWING = False                       # boolean if to apply region growing or not
-IS_REDO_GROWING = False
-IS_REDO_MERGING = False
+IS_REGION_GROWING = True                       # boolean if to apply region growing or not
+IS_REDO_GROWING = True
+IS_REDO_MERGING = True
 IMG_COLOR = 1
 IMG_GRAY = 0
-HOMOGENEITY_THRESHOLD = 0.7
-MIN_SIZE_REGION = 300
+HOMOGENEITY_THRESHOLD = 0.75
+MIN_SIZE_REGION = 500
 MAX_SIZE_REGION = 10000
 REGION_LABELS_FILE = 'labels.npy'
 REGION_NB_LABELS_FILE = 'nb_labels.npy'
@@ -82,19 +83,22 @@ def image_processing(image):
     dura_mask = find_mask(hsv_frame, DURA_LOWER_RANGE, DURA_UPPER_RANGE, False, KERNEL_MORPH)
 
     # create color image
-    colored_bone = (0, 255, 50) * np.ones(image.shape)
-    colored_dura = (255, 0, 0) * np.ones(image.shape)
-    # convert masks into colored masks
-    colored_bone = cv2.bitwise_and(colored_bone, colored_bone, mask=bone_mask)
-    colored_dura = cv2.bitwise_and(colored_dura, colored_dura, mask=dura_mask)
-
-    combined_image = cv2.addWeighted(image, 0.8, np.asarray(colored_bone, image.dtype), 0.5, 0)
-    combined_image = cv2.addWeighted(combined_image, 0.8, np.asarray(colored_dura, image.dtype), 0.5, 0)
+    bone_overlay = color_overlay(image, bone_mask, (0, 255, 255), 0.2)
+    bone_n_dura_overlay = color_overlay(bone_overlay, dura_mask, (255, 0, 0), 0.2)
 
     # Combine the two images == combine masks
     bone_n_dura = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_or(bone_mask, dura_mask))
 
-    return bone_n_dura, combined_image
+    return bone_n_dura, bone_n_dura_overlay
+
+
+def color_overlay(img, mask, color, mask_transparency):
+    # create color image
+    colored_image = color * np.ones(img.shape)
+    # convert masks into colored masks
+    colored_mask = cv2.bitwise_and(colored_image, colored_image, mask=mask)
+    combined_image = cv2.addWeighted(img, 1, np.asarray(colored_mask, img.dtype), mask_transparency, 0)
+    return combined_image
 
 
 '''-------------------------------Region Growing--------------------------------------------------------'''
@@ -109,14 +113,25 @@ def homogeneity_criterion(int_1, int_2, img_type):
         else:
             return False
     else:
-        int_val_1 = math.sqrt(int_1[2] ** 2 + int_1[1] ** 2 + int_1[0] ** 2)
-        int_val_2 = math.sqrt(int_2[2] ** 2 + int_2[1] ** 2 + int_2[0] ** 2)
-        if int_val_1 < (HOMOGENEITY_THRESHOLD + int_val_2) and int_val_2 < (HOMOGENEITY_THRESHOLD + int_val_1):
-        # # only based on Hue value
-        # if int_1[0] < (HOMOGENEITY_THRESHOLD + int_2[0]) and int_2[0] < (HOMOGENEITY_THRESHOLD + int_1[0]):
+        # int_val_1 = math.sqrt(int_1[2] ** 2 + int_1[1] ** 2 + int_1[0] ** 2)
+        # int_val_2 = math.sqrt(int_2[2] ** 2 + int_2[1] ** 2 + int_2[0] ** 2)
+        int_val_1 = math.sqrt(int_1[0] ** 2 + int_1[1] ** 2)
+        int_val_2 = math.sqrt(int_2[0] ** 2 + int_2[1] ** 2)
+        if np.abs(int_val_1 - int_val_2) < HOMOGENEITY_THRESHOLD:
             return True
         else:
             return False
+
+        # #normalise pixel values
+        # int_1_norm = int_1 / HSV_MAX
+        # int_2_norm = int_2 / HSV_MAX
+        # # if np.abs(int_1_norm[0] - int_2_norm[0]) < HOMOGENEITY_THRESHOLD and \
+        # #         np.abs(int_1_norm[1] - int_2_norm[1]) < HOMOGENEITY_THRESHOLD and \
+        # #         np.abs(int_1_norm[2] - int_2_norm[2]) < HOMOGENEITY_THRESHOLD:
+        # if np.abs(int_1_norm[2] - int_2_norm[2]) < HOMOGENEITY_THRESHOLD:
+        #     return True
+        # else:
+        #     return False
 
 
 def in_range(x, y, size_x, size_y):
@@ -233,6 +248,7 @@ def apply_growing_n_merge(img, img_type):
         # on HSV image
         # [labeled_pxl, nb_labels] = region_growing(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), img_type)
         [labeled_pxl, nb_labels] = region_growing(img, img_type)
+        print('nb_labels', nb_labels)
         np.save(REGION_LABELS_FILE, labeled_pxl)
         np.save(REGION_NB_LABELS_FILE, nb_labels)
         # exit_programme()
@@ -278,7 +294,11 @@ frame_blur = cv2.GaussianBlur(frame, (3, 3), 0)
 
 # Find edges
 # convolute with proper kernels
-frame_edges = cv2.Canny(frame_blur, 60, 100, 1)
+v = np.median(image)
+lower = int(max(0, (1.0 - 0.33) * v))
+upper = int(min(255, (1.0 + 0.33) * v))
+frame_edges = cv2.Canny(frame_blur, lower, upper, 3)
+# frame_edges = cv2.Canny(frame_blur, 60, 100, 1)
 # 'close' the image
 kernel_edge = np.ones((3, 3), np.uint8)
 close = np.copy(frame_edges)
@@ -303,16 +323,18 @@ if MEDIA_TYPE == 'image':
     frame = cv2.imread(MEDIA_PATH)
     frame_masked, colored_frame = image_processing(frame)
 
-    img = np.copy(colored_frame)
-    cv2.imshow('frame', cv2.resize(img, None, fx=0.6, fy=0.6))
-    cv2.waitKey(0)
-
     if IS_REGION_GROWING:
         # region growing
-        mask = apply_growing_n_merge(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), IMG_COLOR)
+        mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
+        # mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), IMG_COLOR)
         frame_grown = cv2.bitwise_and(frame, frame, mask=mask)
         # frame_grown = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_not(mask))
         cv2.imshow('frame_grown', cv2.resize(frame_grown, None, fx=0.6, fy=0.6))
+        cv2.waitKey(0)
+
+        # color overlay
+        overlay_region = color_overlay(frame, mask, (255, 0, 0), 0.4)
+        cv2.imshow('grown_overlay', cv2.resize(overlay_region, None, fx=0.6, fy=0.6))
         cv2.waitKey(0)
 
 elif MEDIA_TYPE == 'video':
@@ -341,6 +363,13 @@ elif MEDIA_TYPE == 'video':
             #     out.release()
             #     break
             # save filtered frame in video
+
+            if IS_REGION_GROWING:
+                # region growing
+                mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
+                # color overlay
+                colored_frame = color_overlay(frame, mask, (255, 0, 0), 0.4)
+
             out.write(colored_frame)  # to store the video
         else:
             cap.release()

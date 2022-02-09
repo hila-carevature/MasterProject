@@ -141,6 +141,7 @@ src/HapticDevicePipe/.vs
 *.jpg
 *.PNG
 *.avi
+*.mp4
 
 # Numpy arrays
 *.npy
