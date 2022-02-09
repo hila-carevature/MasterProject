@@ -6,17 +6,17 @@ import skimage.io
 import skimage.measure
 import os
 
-MEDIA_TYPE = 'image'                            # 'image' or 'video'
-MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame142.jpg'
+# MEDIA_TYPE = 'image'                            # 'image' or 'video'
+# MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame142.jpg'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
 
-# MEDIA_TYPE = 'video'                          # 'image' or 'video'
+MEDIA_TYPE = 'video'                          # 'image' or 'video'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
-VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram'
-VIDEO_OUT_NAME = 'Foraminotomy - short - out HSV-growing_coloured.avi'
-# MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy.mp4'
-# VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan'
-# VIDEO_OUT_NAME = 'Foraminotomy - out HSV-coloured.avi'
+# VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram'
+# VIDEO_OUT_NAME = 'Foraminotomy - short - out watershed.avi'
+MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy.mp4'
+VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan'
+VIDEO_OUT_NAME = 'Foraminotomy - out watershed.avi'
 
 
 # Filters in HSV
@@ -27,6 +27,8 @@ DURA_UPPER_RANGE = np.array([166, 255, 255])    # np.array([169, 255, 149])
 KERNEL_MORPH = np.ones((21, 21), np.uint8)      # kernel for morphology close & open
 # HSV_MAX = np.asarray((179, 255, 255))
 
+IS_HSV_THRESH = False
+IS_WATERSHED = True
 IS_REGION_GROWING = False                       # boolean if to apply region growing or not
 IS_REDO_GROWING = False
 IS_REDO_MERGING = False
@@ -324,7 +326,42 @@ def canny_filter(img):
     cv2.waitKey(0)
     return
 
+'''-------------------------------Watershed--------------------------------------------------------'''
 
+
+def watershed(img):
+    """
+    considers the brightness of a pixel as its height and finds the lines that run along the top of those ridges.
+    :param img: origin frame in BGR
+    :return: original frame with lines segmenting the image
+    """
+    # Otsu's binarization
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # noise removal
+    kernel = np.ones((3, 3), np.uint8)
+    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
+    # sure background area
+    sure_bg = cv2.dilate(opening, kernel, iterations=3)
+    # Finding sure foreground area
+    dist_transform = cv2.erode(opening, kernel, iterations=3)
+    ret, sure_fg = cv2.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
+    # Finding unknown region
+    sure_fg = np.uint8(sure_fg)
+    unknown = cv2.subtract(sure_bg, sure_fg)
+
+    # Marker labelling
+    ret, markers = cv2.connectedComponents(sure_fg)
+    # Add one to all labels so that sure background is not 0, but 1
+    markers = markers + 1
+    # Now, mark the region of unknown with zero
+    markers[unknown == 255] = 0
+
+    frame_shed = np.copy(img)
+    markers = cv2.watershed(frame_shed, markers)
+    frame_shed[markers == -1] = [255, 0, 0]
+    return frame_shed
 '''
 # Preprocessing steps: examples
 frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -399,7 +436,8 @@ elif MEDIA_TYPE == 'video':
         print('Cap Open')
         ret, frame = cap.read()
         if ret:
-            frame_masked, colored_frame = image_processing(frame)
+            if IS_HSV_THRESH:
+                frame_masked, colored_frame = image_processing(frame)
             # cv2.imshow('masked', cv2.resize(colored_frame, None, fx=0.6, fy=0.6))
             # key = cv2.waitKey(0)
             # # if press escape key
@@ -408,14 +446,15 @@ elif MEDIA_TYPE == 'video':
             #     out.release()
             #     break
             # save filtered frame in video
-
+            if IS_WATERSHED:
+                frame_out = watershed(frame)
             if IS_REGION_GROWING:
                 # region growing
                 mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
                 # color overlay
-                colored_frame = color_overlay(frame, mask, (255, 0, 0), 0.4)
+                frame_out = color_overlay(frame, mask, (255, 0, 0), 0.4)
 
-            out.write(colored_frame)  # to store the video
+            out.write(frame_out)  # to store the video
         else:
             cap.release()
             out.release()
