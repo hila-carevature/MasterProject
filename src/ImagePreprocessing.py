@@ -4,19 +4,28 @@ import numpy as np
 import math
 import skimage.io
 import skimage.measure
+import skimage.segmentation as segment
 import os
+import skimage
+import logging
 
-# MEDIA_TYPE = 'image'                            # 'image' or 'video'
-# MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame142.jpg'
+# set up debugging printing tool
+logger = logging.getLogger(__name__)
+FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
+logging.basicConfig(format=FORMAT)
+logger.setLevel(logging.DEBUG)
+
+MEDIA_TYPE = 'image'                            # 'image' or 'video'
+MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame1.jpg'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
 
-MEDIA_TYPE = 'video'                          # 'image' or 'video'
+# MEDIA_TYPE = 'video'                          # 'image' or 'video'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
-# VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram'
-# VIDEO_OUT_NAME = 'Foraminotomy - short - out watershed.avi'
-MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy.mp4'
-VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan'
-VIDEO_OUT_NAME = 'Foraminotomy - out watershed.avi'
+VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram'
+VIDEO_OUT_NAME = 'Foraminotomy - short - out watershed_n_grow.avi'
+# MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy.mp4'
+# VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan'
+# VIDEO_OUT_NAME = 'Foraminotomy - out watershed.avi'
 
 
 # Filters in HSV
@@ -35,8 +44,8 @@ IS_REDO_MERGING = False
 IMG_COLOR = 1
 IMG_GRAY = 0
 HOMOGENEITY_THRESHOLD = 0.75
-MIN_SIZE_REGION = 50
-MAX_SIZE_REGION = 10000
+MIN_SIZE_REGION = 2000
+MAX_SIZE_REGION = 100000
 REGION_LABELS_FILE = 'labels.npy'
 REGION_NB_LABELS_FILE = 'nb_labels.npy'
 REGION_MERGED_LABEL_PXL_FILE = 'merged_labels.npy'
@@ -156,7 +165,6 @@ def check_and_add_neighbours(im, x, y, current_label, counter, labels, queue_lis
 
 
 def region_growing(image, img_type):
-    print('started region growing')
     # proceeds to region growing on the entire image
     size_x, size_y = image.shape[0:2]
     # Init of variables
@@ -243,7 +251,7 @@ def merge_regions(labeled_pxl, nb_labels, img):
     return merged_labeled_pxl, np.unique(merged_label_list)
 
 
-def apply_growing_n_merge(img, img_type):
+def apply_growing_n_merge_OLD(img, img_type):
     cv2.imshow('input image', img)
     cv2.waitKey(0)
 
@@ -272,7 +280,6 @@ def apply_growing_n_merge(img, img_type):
         merged_label_list = np.load(REGION_MERGED_LABELS_FILE)
 
     # display each label
-
     for current_label in np.unique(labeled_pxl):
         current_mask_region = cv2.inRange(labeled_pxl, int(current_label), int(current_label))
         nb_pxl = np.count_nonzero(current_mask_region)
@@ -361,7 +368,69 @@ def watershed(img):
     frame_shed = np.copy(img)
     markers = cv2.watershed(frame_shed, markers)
     frame_shed[markers == -1] = [255, 0, 0]
-    return frame_shed
+    # convert markers to values between 0-255
+    markers = np.uint8(markers+1)
+    markers_rescaled = np.copy(markers)
+    markers_rescaled *= 255 // markers_rescaled.max()
+    colored_image = cv2.applyColorMap(markers_rescaled, cv2.COLORMAP_HSV)
+    return frame_shed, colored_image, markers
+
+
+def watershed_n_region_grow(image):
+    frame_shed, marked_frame, markers = watershed(image)
+
+    # cv2.imshow('markers', markers)
+    # cv2.imshow('markered_frame', marked_frame)
+    # cv2.imshow('frame_shed', frame_shed)
+    # cv2.waitKey()
+
+    labeled_pixels = np.copy(markers)
+    new_label = np.max(markers) + 1
+    # go through markers, for each marker, give connected regions a new label, keep only regions with desired dimensions
+    marker_list, marker_areas = np.unique(markers, return_counts=True)
+    for current_mark, marker_areas in zip(marker_list, marker_areas):
+        seed_points = np.asarray(np.where(labeled_pixels == current_mark))
+        print('labeled_area', marker_areas)
+        if MIN_SIZE_REGION < marker_areas:
+            # if MIN_SIZE_REGION < region_size < MAX_SIZE_REGION:
+            while seed_points.size != 0:
+                segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
+
+                seed_points = np.asarray(np.where(labeled_pixels == current_mark))
+                new_label += 1
+
+    labeled_pixels *= 255 // np.max(labeled_pixels)
+    colored_image_new = cv2.applyColorMap(labeled_pixels, cv2.COLORMAP_JET)
+    overlay_frame = cv2.addWeighted(frame, 1, colored_image_new, 0.5, 0)
+    cv2.imshow('colored_image_new', colored_image_new)
+    cv2.imshow('overlay_frame', overlay_frame)
+    cv2.waitKey()
+
+    if IS_REDO_GROWING:
+        # region growing: label separated regions with different labels
+        [labeled_pxl, nb_labels] = region_growing(marked_frame, IMG_COLOR)
+        # convert grown labeled pixels into picture 0-255 values
+        labeled_pxl = np.uint8(labeled_pxl)
+        labeled_pxl *= 255 // labeled_pxl.max()
+        labeled_frame = cv2.applyColorMap(labeled_pxl, cv2.COLORMAP_HSV)
+        # remove small&large objects from label_list
+        labels_list, label_pxl_count = np.unique(labeled_pxl, return_counts=True)  # 2D array [label, nb_pixel w/ label]
+        small_pxl_label_id = np.concatenate(
+            (np.where(MIN_SIZE_REGION > label_pxl_count)[0], np.where(label_pxl_count > MAX_SIZE_REGION)[0]))
+        big_label_list = np.delete(labels_list, small_pxl_label_id)
+
+        # combine colored regions of all large objects into one picture
+        combined_regions = cv2.inRange(labeled_pxl, int(big_label_list[0]), int(big_label_list[0]))
+        for current_label in big_label_list[1:]:  # start from 2nd element
+            # choose one region
+            current_mask_region = cv2.inRange(labeled_pxl, int(current_label), int(current_label))
+            combined_regions = cv2.bitwise_or(combined_regions, current_mask_region)
+
+        combined_labeled_frame = cv2.bitwise_and(labeled_frame, labeled_frame, mask=combined_regions)
+        # overlay colored regions on original image
+        overlay_frame = cv2.addWeighted(frame, 1, combined_labeled_frame, 0.5, 0)
+
+    return frame_shed, overlay_frame
 '''
 # Preprocessing steps: examples
 frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -397,27 +466,38 @@ cv2.waitKey(0)
 if MEDIA_TYPE == 'image':
     # load image
     frame = cv2.imread(MEDIA_PATH)
-    frame_masked, colored_frame = image_processing(frame)
 
     # canny_filter(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
-    canny_filter(frame[:, :, 1])
+    # canny_filter(frame[:, :, 1])
     # cv2.imwrite('../res/surgery_images/frame52GreenChannel.jpg', frame[:, :, 1])
+
+    if IS_HSV_THRESH:
+        frame_out, colored_frame = image_processing(frame)
+    # cv2.imshow('masked', cv2.resize(colored_frame, None, fx=0.6, fy=0.6))
+    # key = cv2.waitKey(0)
+    # # if press escape key
+    # if key == 27:
+    #     cap.release()
+    #     out.release()
+    #     break
+    if IS_WATERSHED:
+        frame_out, colored_frame = watershed_n_region_grow(frame)
 
     if IS_REGION_GROWING:
         # region growing
         # frame = frame[:, :, 1]
         # mask = apply_growing_n_merge(frame, IMG_GRAY)
-        mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
+        mask = apply_growing_n_merge_OLD(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
         # mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), IMG_COLOR)
-        frame_grown = cv2.bitwise_and(frame, frame, mask=mask)
+        frame_out = cv2.bitwise_and(frame, frame, mask=mask)
         # frame_grown = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_not(mask))
-        cv2.imshow('frame_grown', cv2.resize(frame_grown, None, fx=0.6, fy=0.6))
-        cv2.waitKey(0)
 
         # color overlay
-        overlay_region = color_overlay(frame, mask, (255, 0, 0), 0.4)
-        cv2.imshow('grown_overlay', cv2.resize(overlay_region, None, fx=0.6, fy=0.6))
-        cv2.waitKey(0)
+        colored_frame = color_overlay(frame, mask, (255, 0, 0), 0.4)
+
+    cv2.imshow('frame out', cv2.resize(frame_out, None, fx=0.6, fy=0.6))
+    cv2.imshow('colored frame', cv2.resize(colored_frame, None, fx=0.6, fy=0.6))
+    cv2.waitKey(0)
 
 elif MEDIA_TYPE == 'video':
     # Load video:
@@ -447,14 +527,14 @@ elif MEDIA_TYPE == 'video':
             #     break
             # save filtered frame in video
             if IS_WATERSHED:
-                frame_out = watershed(frame)
+                frame_out, colored_frame = watershed_n_region_grow(frame)
             if IS_REGION_GROWING:
                 # region growing
-                mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
+                mask = apply_growing_n_merge_OLD(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
                 # color overlay
                 frame_out = color_overlay(frame, mask, (255, 0, 0), 0.4)
 
-            out.write(frame_out)  # to store the video
+            out.write(colored_frame)  # to store the video
         else:
             cap.release()
             out.release()
