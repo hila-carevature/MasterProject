@@ -385,33 +385,44 @@ def watershed_n_region_grow(image):
     # cv2.waitKey()
 
     labeled_pixels = np.copy(markers)
-    new_label = np.max(markers)
+    new_label = int(np.max(markers))
+    combined_regions = np.zeros(np.shape(markers), np.uint8)
     # go through markers, for each marker, give connected regions a new label, keep only regions with desired dimensions
-    for current_mark in np.unique(markers):
-        seed_points = np.asarray(np.where(labeled_pixels == current_mark))
-        # while np.size(seed_points, 1) != 0:
-        #     new_label += 1
-        #     print('marker', current_mark, 'len seed', np.size(seed_points, 1))
-        #     segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
-        #     seed_points = np.asarray(np.where(labeled_pixels == current_mark))
-        # Attempt to ignore tiny and giant areas
-        while np.size(seed_points, 1) != 0:
-            new_label += 10
-            print('marker', current_mark, 'len seed', np.size(seed_points, 1))
-            if MIN_SIZE_REGION < np.size(seed_points, 1) < 300000:
-                print('not break, new_label', new_label)
-                segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
-                seed_points = np.asarray(np.where(labeled_pixels == current_mark))
-            else:
-                labeled_pixels[labeled_pixels == current_mark] = 255
-                print('break')
-                break
+    for current_marker in np.unique(markers)[1:]:
+        seed_points = np.asarray(np.where(labeled_pixels == current_marker))
+        while np.size(seed_points, 1) > MIN_SIZE_REGION:
+            new_label += 5
+            print('marker', current_marker, 'len seed', np.size(seed_points, 1))
+            segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
+            seed_points_prev = seed_points
+            seed_points = np.asarray(np.where(labeled_pixels == current_marker))
+            # if currently segmented region has correct dimensions, combine it to final regions
+            if MIN_SIZE_REGION < np.size(seed_points_prev, 1) - np.size(seed_points, 1) < MAX_SIZE_REGION:
+                current_mask = cv2.inRange(labeled_pixels, new_label, new_label)
+                combined_regions = cv2.bitwise_or(combined_regions, current_mask)
 
-    labeled_pixels *= 255 // np.max(labeled_pixels)
-    colored_image_new = cv2.applyColorMap(labeled_pixels, cv2.COLORMAP_JET)
-    overlay_frame = cv2.addWeighted(frame, 1, colored_image_new, 0.5, 0)
-    cv2.imshow('colored_image_new', colored_image_new)
-    cv2.waitKey()
+    combined_labeled_frame = cv2.bitwise_and(labeled_pixels, labeled_pixels, mask=combined_regions)
+
+    # OPEN & CLOSE
+    combined_labeled_frame *= 255 // np.max(combined_labeled_frame)
+    overlay_frame = cv2.addWeighted(image, 1, cv2.cvtColor(cv2.cvtColor(combined_labeled_frame, cv2.COLOR_GRAY2BGR),
+                                                           cv2.COLOR_BGR2HSV), 0.2, 0)
+
+    # # flood-fill: Attempt to ignore tiny and giant areas
+    # for current_marker in np.unique(markers):
+    #     seed_points = np.asarray(np.where(labeled_pixels == current_marker))
+    #     while np.size(seed_points, 1) != 0:
+    #         new_label += 10
+    #         print('marker', current_marker, 'len seed', np.size(seed_points, 1))
+    #         if MIN_SIZE_REGION < np.size(seed_points, 1) < 300000:
+    #             print('not break, new_label', new_label)
+    #             segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
+    #             seed_points = np.asarray(np.where(labeled_pixels == current_marker))
+    #         else:
+    #             labeled_pixels[labeled_pixels == current_marker] = 255
+    #             print('break')
+    #             break
+
 
     # # Region growing on watershed markers. Works well but too slow.
     # if IS_REDO_GROWING:
@@ -503,6 +514,7 @@ if MEDIA_TYPE == 'image':
         # color overlay
         colored_frame = color_overlay(frame, mask, (255, 0, 0), 0.4)
 
+    cv2.imshow('frame', cv2.resize(frame, None, fx=0.6, fy=0.6))
     cv2.imshow('frame out', cv2.resize(frame_out, None, fx=0.6, fy=0.6))
     cv2.imshow('colored frame', cv2.resize(colored_frame, None, fx=0.6, fy=0.6))
     cv2.waitKey(0)
