@@ -383,30 +383,28 @@ def watershed_n_region_grow(image):
     # cv2.imshow('markered_frame', marked_frame)
     # cv2.imshow('frame_shed', frame_shed)
     # cv2.waitKey()
+    kernel = np.ones((11, 11), np.uint8)
 
     labeled_pixels = np.copy(markers)
     new_label = int(np.max(markers))
-    combined_regions = np.zeros(np.shape(markers), np.uint8)
+    overlay_frame = np.copy(image)
     # go through markers, for each marker, give connected regions a new label, keep only regions with desired dimensions
     for current_marker in np.unique(markers)[1:]:
         seed_points = np.asarray(np.where(labeled_pixels == current_marker))
         while np.size(seed_points, 1) > MIN_SIZE_REGION:
-            new_label += 5
-            print('marker', current_marker, 'len seed', np.size(seed_points, 1))
+            new_label += 1
             segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
             seed_points_prev = seed_points
             seed_points = np.asarray(np.where(labeled_pixels == current_marker))
             # if currently segmented region has correct dimensions, combine it to final regions
             if MIN_SIZE_REGION < np.size(seed_points_prev, 1) - np.size(seed_points, 1) < MAX_SIZE_REGION:
                 current_mask = cv2.inRange(labeled_pixels, new_label, new_label)
-                combined_regions = cv2.bitwise_or(combined_regions, current_mask)
+                # 'close' the image to remove noise & fill holes inside object
+                current_mask = cv2.morphologyEx(current_mask, cv2.MORPH_CLOSE, kernel)
+                # 'open' the image to smoothen boundaries
+                current_mask = cv2.morphologyEx(current_mask, cv2.MORPH_OPEN, kernel)
+                overlay_frame = color_overlay(overlay_frame, current_mask, (0, 255, 0), 0.4)
 
-    combined_labeled_frame = cv2.bitwise_and(labeled_pixels, labeled_pixels, mask=combined_regions)
-
-    # OPEN & CLOSE
-    combined_labeled_frame *= 255 // np.max(combined_labeled_frame)
-    overlay_frame = cv2.addWeighted(image, 1, cv2.cvtColor(cv2.cvtColor(combined_labeled_frame, cv2.COLOR_GRAY2BGR),
-                                                           cv2.COLOR_BGR2HSV), 0.2, 0)
 
     # # flood-fill: Attempt to ignore tiny and giant areas
     # for current_marker in np.unique(markers):
