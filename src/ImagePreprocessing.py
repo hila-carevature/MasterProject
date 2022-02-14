@@ -371,7 +371,7 @@ def watershed(img):
     # convert markers to values between 0-255
     markers = np.uint8(markers+1)
     markers_rescaled = np.copy(markers)
-    markers_rescaled *= 255 // markers_rescaled.max()
+    markers_rescaled *= 255 // np.max(markers_rescaled)
     colored_image = cv2.applyColorMap(markers_rescaled, cv2.COLORMAP_HSV)
     return frame_shed, colored_image, markers
 
@@ -385,50 +385,58 @@ def watershed_n_region_grow(image):
     # cv2.waitKey()
 
     labeled_pixels = np.copy(markers)
-    new_label = np.max(markers) + 1
+    new_label = np.max(markers)
     # go through markers, for each marker, give connected regions a new label, keep only regions with desired dimensions
-    marker_list, marker_areas = np.unique(markers, return_counts=True)
-    for current_mark, marker_areas in zip(marker_list, marker_areas):
+    for current_mark in np.unique(markers):
         seed_points = np.asarray(np.where(labeled_pixels == current_mark))
-        print('labeled_area', marker_areas)
-        if MIN_SIZE_REGION < marker_areas:
-            # if MIN_SIZE_REGION < region_size < MAX_SIZE_REGION:
-            while seed_points.size != 0:
+        # while np.size(seed_points, 1) != 0:
+        #     new_label += 1
+        #     print('marker', current_mark, 'len seed', np.size(seed_points, 1))
+        #     segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
+        #     seed_points = np.asarray(np.where(labeled_pixels == current_mark))
+        # Attempt to ignore tiny and giant areas
+        while np.size(seed_points, 1) != 0:
+            new_label += 10
+            print('marker', current_mark, 'len seed', np.size(seed_points, 1))
+            if MIN_SIZE_REGION < np.size(seed_points, 1) < 300000:
+                print('not break, new_label', new_label)
                 segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
-
                 seed_points = np.asarray(np.where(labeled_pixels == current_mark))
-                new_label += 1
+            else:
+                labeled_pixels[labeled_pixels == current_mark] = 255
+                print('break')
+                break
 
     labeled_pixels *= 255 // np.max(labeled_pixels)
     colored_image_new = cv2.applyColorMap(labeled_pixels, cv2.COLORMAP_JET)
     overlay_frame = cv2.addWeighted(frame, 1, colored_image_new, 0.5, 0)
     cv2.imshow('colored_image_new', colored_image_new)
-    cv2.imshow('overlay_frame', overlay_frame)
     cv2.waitKey()
 
-    if IS_REDO_GROWING:
-        # region growing: label separated regions with different labels
-        [labeled_pxl, nb_labels] = region_growing(marked_frame, IMG_COLOR)
-        # convert grown labeled pixels into picture 0-255 values
-        labeled_pxl = np.uint8(labeled_pxl)
-        labeled_pxl *= 255 // labeled_pxl.max()
-        labeled_frame = cv2.applyColorMap(labeled_pxl, cv2.COLORMAP_HSV)
-        # remove small&large objects from label_list
-        labels_list, label_pxl_count = np.unique(labeled_pxl, return_counts=True)  # 2D array [label, nb_pixel w/ label]
-        small_pxl_label_id = np.concatenate(
-            (np.where(MIN_SIZE_REGION > label_pxl_count)[0], np.where(label_pxl_count > MAX_SIZE_REGION)[0]))
-        big_label_list = np.delete(labels_list, small_pxl_label_id)
-
-        # combine colored regions of all large objects into one picture
-        combined_regions = cv2.inRange(labeled_pxl, int(big_label_list[0]), int(big_label_list[0]))
-        for current_label in big_label_list[1:]:  # start from 2nd element
-            # choose one region
-            current_mask_region = cv2.inRange(labeled_pxl, int(current_label), int(current_label))
-            combined_regions = cv2.bitwise_or(combined_regions, current_mask_region)
-
-        combined_labeled_frame = cv2.bitwise_and(labeled_frame, labeled_frame, mask=combined_regions)
-        # overlay colored regions on original image
-        overlay_frame = cv2.addWeighted(frame, 1, combined_labeled_frame, 0.5, 0)
+    # # Region growing on watershed markers. Works well but too slow.
+    # if IS_REDO_GROWING:
+    #     # region growing: label separated regions with different labels
+    #     [labeled_pxl, nb_labels] = region_growing(marked_frame, IMG_COLOR)
+    #     # convert grown labeled pixels into picture 0-255 values
+    #     labeled_pxl = np.uint8(labeled_pxl)
+    #     labeled_pxl *= 255 // labeled_pxl.max()
+    #     labeled_frame = cv2.applyColorMap(labeled_pxl, cv2.COLORMAP_HSV)
+    #     # remove small&large objects from label_list
+    #     labels_list, label_pxl_count = np.unique(labeled_pxl, return_counts=True)  # 2D array [label, nb_pixel w/ label]
+    #     small_pxl_label_id = np.concatenate(
+    #         (np.where(MIN_SIZE_REGION > label_pxl_count)[0], np.where(label_pxl_count > MAX_SIZE_REGION)[0]))
+    #     big_label_list = np.delete(labels_list, small_pxl_label_id)
+    #
+    #     # combine colored regions of all large objects into one picture
+    #     combined_regions = cv2.inRange(labeled_pxl, int(big_label_list[0]), int(big_label_list[0]))
+    #     for current_label in big_label_list[1:]:  # start from 2nd element
+    #         # choose one region
+    #         current_mask_region = cv2.inRange(labeled_pxl, int(current_label), int(current_label))
+    #         combined_regions = cv2.bitwise_or(combined_regions, current_mask_region)
+    #
+    #     combined_labeled_frame = cv2.bitwise_and(labeled_frame, labeled_frame, mask=combined_regions)
+    #     # overlay colored regions on original image
+    #     overlay_frame = cv2.addWeighted(frame, 1, combined_labeled_frame, 0.5, 0)
 
     return frame_shed, overlay_frame
 '''
