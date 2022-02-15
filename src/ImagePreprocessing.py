@@ -8,6 +8,7 @@ import skimage.segmentation as segment
 import os
 import skimage
 import logging
+import time
 
 # set up debugging printing tool
 logger = logging.getLogger(__name__)
@@ -16,13 +17,13 @@ logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.DEBUG)
 
 MEDIA_TYPE = 'image'                            # 'image' or 'video'
-MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame1.jpg'
+MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame52.jpg'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
 
 # MEDIA_TYPE = 'video'                          # 'image' or 'video'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
 VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram'
-VIDEO_OUT_NAME = 'Foraminotomy - short - out watershed_n_grow.avi'
+VIDEO_OUT_NAME = 'Foraminotomy - short - out watershed_n_flood_fill.avi'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Keynan/Foraminotomy.mp4'
 # VIDEO_OUT_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Keynan'
 # VIDEO_OUT_NAME = 'Foraminotomy - out watershed.avi'
@@ -376,19 +377,21 @@ def watershed(img):
     return frame_shed, colored_image, markers
 
 
-def watershed_n_region_grow(image):
+def watershed_n_post_process(image):
     frame_shed, marked_frame, markers = watershed(image)
 
     # cv2.imshow('markers', markers)
     # cv2.imshow('markered_frame', marked_frame)
     # cv2.imshow('frame_shed', frame_shed)
     # cv2.waitKey()
-    kernel = np.ones((11, 11), np.uint8)
 
+    # Go through markers, for each marker, give connected regions a new label, keep only regions with desired dimensions
+    # Flood fill: take only correct size regions and color them
+    time_flood1_init = time.time_ns()
+    kernel = np.ones((11, 11), np.uint8)
     labeled_pixels = np.copy(markers)
     new_label = int(np.max(markers))
     overlay_frame = np.copy(image)
-    # go through markers, for each marker, give connected regions a new label, keep only regions with desired dimensions
     for current_marker in np.unique(markers)[1:]:
         seed_points = np.asarray(np.where(labeled_pixels == current_marker))
         while np.size(seed_points, 1) > MIN_SIZE_REGION:
@@ -404,26 +407,37 @@ def watershed_n_region_grow(image):
                 # 'open' the image to smoothen boundaries
                 current_mask = cv2.morphologyEx(current_mask, cv2.MORPH_OPEN, kernel)
                 overlay_frame = color_overlay(overlay_frame, current_mask, (0, 255, 0), 0.4)
+    time_flood1_end = time.time_ns()
+    print('time flood 1 [ns]', time_flood1_end - time_flood1_init)
 
-
-    # # flood-fill: Attempt to ignore tiny and giant areas
+    # # flood-fill: Attempt to ignore tiny and giant areas. The background is red, this is not good
+    # time_flood2_init = time.time_ns()
+    # labeled_pixels = np.copy(markers)
+    # new_label = int(np.max(markers))
     # for current_marker in np.unique(markers):
     #     seed_points = np.asarray(np.where(labeled_pixels == current_marker))
     #     while np.size(seed_points, 1) != 0:
     #         new_label += 10
-    #         print('marker', current_marker, 'len seed', np.size(seed_points, 1))
+    #         # print('marker', current_marker, 'len seed', np.size(seed_points, 1))
     #         if MIN_SIZE_REGION < np.size(seed_points, 1) < 300000:
-    #             print('not break, new_label', new_label)
+    #             # print('not break, new_label', new_label)
     #             segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
     #             seed_points = np.asarray(np.where(labeled_pixels == current_marker))
     #         else:
     #             labeled_pixels[labeled_pixels == current_marker] = 255
-    #             print('break')
+    #             # print('break')
     #             break
-
+    # labeled_pixels *= 255 // np.max(labeled_pixels)
+    # colored_image_new = cv2.applyColorMap(labeled_pixels, cv2.COLORMAP_JET)
+    # overlay_frame = cv2.addWeighted(frame, 1, colored_image_new, 0.5, 0)
+    # time_flood2_end = time.time_ns()
+    # print('time flood 2 [ns]', time_flood2_end - time_flood2_init)
+    # cv2.imshow('flood2', overlay_frame)
+    # cv2.waitKey()
 
     # # Region growing on watershed markers. Works well but too slow.
     # if IS_REDO_GROWING:
+    #     time_grow_init = time.time_ns()
     #     # region growing: label separated regions with different labels
     #     [labeled_pxl, nb_labels] = region_growing(marked_frame, IMG_COLOR)
     #     # convert grown labeled pixels into picture 0-255 values
@@ -446,6 +460,10 @@ def watershed_n_region_grow(image):
     #     combined_labeled_frame = cv2.bitwise_and(labeled_frame, labeled_frame, mask=combined_regions)
     #     # overlay colored regions on original image
     #     overlay_frame = cv2.addWeighted(frame, 1, combined_labeled_frame, 0.5, 0)
+    #     time_grow_end = time.time_ns()
+    #     print('time grow [ns]', time_grow_end - time_grow_init)
+    #     cv2.imshow('grow', overlay_frame)
+    #     cv2.waitKey()
 
     return frame_shed, overlay_frame
 '''
@@ -498,7 +516,7 @@ if MEDIA_TYPE == 'image':
     #     out.release()
     #     break
     if IS_WATERSHED:
-        frame_out, colored_frame = watershed_n_region_grow(frame)
+        frame_out, colored_frame = watershed_n_post_process(frame)
 
     if IS_REGION_GROWING:
         # region growing
@@ -545,7 +563,7 @@ elif MEDIA_TYPE == 'video':
             #     break
             # save filtered frame in video
             if IS_WATERSHED:
-                frame_out, colored_frame = watershed_n_region_grow(frame)
+                frame_out, colored_frame = watershed_n_post_process(frame)
             if IS_REGION_GROWING:
                 # region growing
                 mask = apply_growing_n_merge_OLD(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
