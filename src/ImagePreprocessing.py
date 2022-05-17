@@ -9,6 +9,7 @@ import os
 import skimage
 import logging
 import time
+import matplotlib.pyplot as plt
 
 # set up debugging printing tool
 logger = logging.getLogger(__name__)
@@ -17,8 +18,8 @@ logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.DEBUG)
 
 MEDIA_TYPE = 'image'                            # 'image' or 'video'
-MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short/cropped/frame52.jpg'
-# MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Millgram/swab_wonder.PNG'
+MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Dreal-mounted camera/Dreal-mounted/cropped/frame15654.jpg'
+# MEDIA_PATH = '../res/surgery_images/Surgical Cases/Khoo/Segment03-ipsi 2/frame3406.jpg'
 
 # MEDIA_TYPE = 'video'                          # 'image' or 'video'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
@@ -39,6 +40,7 @@ KERNEL_MORPH = np.ones((21, 21), np.uint8)      # kernel for morphology close & 
 
 IS_HSV_THRESH = False
 IS_WATERSHED = True
+IS_WATERSHED_SEPARATION = False
 IS_REGION_GROWING = False                       # boolean if to apply region growing or not
 IS_REDO_GROWING = False
 IS_REDO_MERGING = False
@@ -81,6 +83,18 @@ def find_mask(image, lower_range, upper_range, inv_bool, kernel):
     return mask
 
 
+def color_overlay(img, mask, color, mask_transparency):
+    # create color image
+    colored_image = color * np.ones(img.shape)
+    # convert masks into colored masks
+    colored_mask = cv2.bitwise_and(colored_image, colored_image, mask=mask)
+    combined_image = cv2.addWeighted(img, 1, np.asarray(colored_mask, img.dtype), mask_transparency, 0)
+    return combined_image
+
+
+'''-------------------------------Simple Thresholding--------------------------------------------------------'''
+
+
 def image_processing(image):
     """
     Finds regions with bone & dura, computes their corresponding masks and returns an image with the dura & bone regions
@@ -102,15 +116,6 @@ def image_processing(image):
     bone_n_dura = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_or(bone_mask, dura_mask))
 
     return bone_n_dura, bone_n_dura_overlay
-
-
-def color_overlay(img, mask, color, mask_transparency):
-    # create color image
-    colored_image = color * np.ones(img.shape)
-    # convert masks into colored masks
-    colored_mask = cv2.bitwise_and(colored_image, colored_image, mask=mask)
-    combined_image = cv2.addWeighted(img, 1, np.asarray(colored_mask, img.dtype), mask_transparency, 0)
-    return combined_image
 
 
 '''-------------------------------Region Growing--------------------------------------------------------'''
@@ -334,6 +339,7 @@ def canny_filter(img):
     cv2.waitKey(0)
     return
 
+
 '''-------------------------------Watershed--------------------------------------------------------'''
 
 
@@ -344,8 +350,15 @@ def watershed(img):
     :return: original frame with lines segmenting the image
     """
     # Otsu's binarization
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # img_filtered = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # filter_name = 'gray'
+    # img_filtered = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    img_filtered = img[:, :, 2]
+    filter_name = 'red'
+    plt.imshow(img_filtered)
+    cv2.waitKey()
+    cv2.imshow(filter_name, cv2.resize(img_filtered, None, fx=0.8, fy=0.8))
+    ret, thresh = cv2.threshold(img_filtered, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
     # noise removal
     kernel = np.ones((3, 3), np.uint8)
@@ -379,36 +392,37 @@ def watershed(img):
 
 def watershed_n_post_process(image):
     frame_shed, marked_frame, markers = watershed(image)
-
+    overlay_frame = np.copy(marked_frame)
     # cv2.imshow('markers', markers)
     # cv2.imshow('markered_frame', marked_frame)
     # cv2.imshow('frame_shed', frame_shed)
     # cv2.waitKey()
 
-    # Go through markers, for each marker, give connected regions a new label, keep only regions with desired dimensions
-    # Flood fill: take only correct size regions and color them
-    time_flood1_init = time.time_ns()
-    kernel = np.ones((11, 11), np.uint8)
-    labeled_pixels = np.copy(markers)
-    new_label = int(np.max(markers))
-    overlay_frame = np.copy(image)
-    for current_marker in np.unique(markers)[1:]:
-        seed_points = np.asarray(np.where(labeled_pixels == current_marker))
-        while np.size(seed_points, 1) > MIN_SIZE_REGION:
-            new_label += 1
-            segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
-            seed_points_prev = seed_points
+    if IS_WATERSHED_SEPARATION:
+        # Go through markers, for each marker, give connected regions a new label, keep only regions with desired dimensions
+        # Flood fill: take only correct size regions and color them
+        time_flood1_init = time.time_ns()
+        kernel = np.ones((11, 11), np.uint8)
+        labeled_pixels = np.copy(markers)
+        new_label = int(np.max(markers))
+        overlay_frame = np.copy(image)
+        for current_marker in np.unique(markers)[1:]:
             seed_points = np.asarray(np.where(labeled_pixels == current_marker))
-            # if currently segmented region has correct dimensions, combine it to final regions
-            if MIN_SIZE_REGION < np.size(seed_points_prev, 1) - np.size(seed_points, 1) < MAX_SIZE_REGION:
-                current_mask = cv2.inRange(labeled_pixels, new_label, new_label)
-                # 'close' the image to remove noise & fill holes inside object
-                current_mask = cv2.morphologyEx(current_mask, cv2.MORPH_CLOSE, kernel)
-                # 'open' the image to smoothen boundaries
-                current_mask = cv2.morphologyEx(current_mask, cv2.MORPH_OPEN, kernel)
-                overlay_frame = color_overlay(overlay_frame, current_mask, (0, 255, 0), 0.4)
-    time_flood1_end = time.time_ns()
-    print('time flood 1 [ns]', time_flood1_end - time_flood1_init)
+            while np.size(seed_points, 1) > MIN_SIZE_REGION:
+                new_label += 1
+                segment.flood_fill(labeled_pixels, tuple(seed_points[:, 0]), new_label, in_place=True)
+                seed_points_prev = seed_points
+                seed_points = np.asarray(np.where(labeled_pixels == current_marker))
+                # if currently segmented region has correct dimensions, combine it to final regions
+                if MIN_SIZE_REGION < np.size(seed_points_prev, 1) - np.size(seed_points, 1) < MAX_SIZE_REGION:
+                    current_mask = cv2.inRange(labeled_pixels, new_label, new_label)
+                    # 'close' the image to remove noise & fill holes inside object
+                    current_mask = cv2.morphologyEx(current_mask, cv2.MORPH_CLOSE, kernel)
+                    # 'open' the image to smoothen boundaries
+                    current_mask = cv2.morphologyEx(current_mask, cv2.MORPH_OPEN, kernel)
+                    overlay_frame = color_overlay(overlay_frame, current_mask, (0, 255, 0), 0.4)
+        time_flood1_end = time.time_ns()
+        print('time flood 1 [ns]', time_flood1_end - time_flood1_init)
 
     # # flood-fill: Attempt to ignore tiny and giant areas. The background is red, this is not good
     # time_flood2_init = time.time_ns()
@@ -466,6 +480,21 @@ def watershed_n_post_process(image):
     #     cv2.waitKey()
 
     return frame_shed, overlay_frame
+
+
+'''-------------------------------Color Separation--------------------------------------------------------'''
+
+
+def hsv2wavelength(hsv_image):
+    # There is nothing corresponding to magenta in the light spectrum,
+    # So let's assume that we only use hue values between 0 and 270.
+    # Estimating that the usable part of the visible spectrum is 400-650 nm, with wavelength(in nm) and hue value ( in degrees), you can improvise this:
+    wavelength = 650 - 250 / 270 * hsv_image[:, :, 0]
+    plt.imshow(wavelength)
+    plt.colorbar()
+    return wavelength
+
+
 '''
 # Preprocessing steps: examples
 frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -530,9 +559,9 @@ if MEDIA_TYPE == 'image':
         # color overlay
         colored_frame = color_overlay(frame, mask, (255, 0, 0), 0.4)
 
-    cv2.imshow('frame', cv2.resize(frame, None, fx=0.6, fy=0.6))
-    cv2.imshow('frame out', cv2.resize(frame_out, None, fx=0.6, fy=0.6))
-    cv2.imshow('colored frame', cv2.resize(colored_frame, None, fx=0.6, fy=0.6))
+    cv2.imshow('frame', cv2.resize(frame, None, fx=0.8, fy=0.8))
+    cv2.imshow('frame out', cv2.resize(frame_out, None, fx=0.8, fy=0.8))
+    # cv2.imshow('colored frame', cv2.resize(colored_frame, None, fx=0.8, fy=0.8))
     cv2.waitKey(0)
 
 elif MEDIA_TYPE == 'video':
