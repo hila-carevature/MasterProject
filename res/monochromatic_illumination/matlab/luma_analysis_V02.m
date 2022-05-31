@@ -1,6 +1,6 @@
 % Monochromatic illumination data analysis
 
-% data: (sample x features): features = [test_type, frame_nb, tissue_id, mean, std]
+% data: (sample x features): features = [test_type, mean_tissue1, mean_tissue2]
 load lumavaluesa.mat
 raw_data = lumavaluesa;
 % remove heading rows : lighting_type = NaN
@@ -18,7 +18,7 @@ tissue_types(1) = [];
 
 % data array (sample, tissue_type, test_type)
 new_data = zeros(max_nb_datapoints, length(tissue_types), length(lighting_types));
-
+p_values = [];
 % separate table into array [lighting_type] x [tissue_type] x [sample] x [feature] 
 for i=1:length(lighting_types)
     
@@ -26,6 +26,6 @@ for i=1:length(lighting_types)
     % remove abundant data
     data_temp(max_nb_datapoints+1:end, :) = [];
     new_data(:, :, i) = data_temp;    
-    anova1(new_data(:, :, i), tissue_types)
+    p_values = [p_values, anova1(new_data(:, :, i), tissue_types)];
 end
 

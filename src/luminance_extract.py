@@ -2,7 +2,7 @@
 # For every 10th frame from a given video,
 # Find luminance mean & std values in a rectangular part of the image corresponding to bone/dura
 # input: video
-# output: .csv file with array (sample x features): features = [test_type, frame_nb, tissue_id, mean, std]
+# output: .csv file with array (sample x features): features = [test_type, mean_tissue1, mean_tissue2]
 
 import os
 import numpy as np
@@ -79,7 +79,7 @@ if __name__ == "__main__":
                 # stats = np.append(stats, [[LIGHTING_TYPE, frame_counter, "bone", np.mean(rect_bone), np.std(rect_bone)]], axis=0)
                 # stats = np.append(stats, [[LIGHTING_TYPE, frame_counter, "dura", np.mean(rect_dura), np.std(rect_dura)]], axis=0)
 
-                stats = np.append(stats, [[LIGHTING_TYPE, np.mean(rect_bone),np.mean(rect_dura)]], axis=0)
+                stats = np.append(stats, [[LIGHTING_TYPE, np.mean(rect_bone), np.mean(rect_dura)]], axis=0)
             frame_counter += 1
         else:
             break
