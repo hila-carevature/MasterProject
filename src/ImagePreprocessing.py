@@ -18,8 +18,11 @@ logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.DEBUG)
 
 MEDIA_TYPE = 'image'                            # 'image' or 'video'
-MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Dreal-mounted camera/Dreal-mounted/cropped/frame15654.jpg'
-# MEDIA_PATH = '../res/surgery_images/Surgical Cases/Khoo/Segment03-ipsi 2/frame3406.jpg'
+# MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Dreal-mounted camera/Dreal-mounted/cropped/frame15654.jpg'
+MEDIA_PATH = '../res/monochromatic_illumination/2022-05-02 experiment1/700nm.png'
+MEDIA_NAME = '700nm_watershed_blue.png'
+MEDIA_NAME_COLOURED = '700nm_blue.png'
+MEDIA_OUT_PATH = '../res/monochromatic_illumination/2022-05-02 experiment1/watershed_blue'
 
 # MEDIA_TYPE = 'video'                          # 'image' or 'video'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
@@ -340,6 +343,15 @@ def canny_filter(img):
     return
 
 
+'''-------------------------------Luma--------------------------------------------------------'''
+
+
+def bgr2luma(frame):
+    # R*0.222 + G*0.717 + B*0.061
+    luma = frame[:, :, 0] * 0.061 + frame[:, :, 1] * 0.717 + frame[:, :, 2] * 0.222
+    return np.uint8(luma)
+
+
 '''-------------------------------Watershed--------------------------------------------------------'''
 
 
@@ -353,12 +365,22 @@ def watershed(img):
     # img_filtered = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # filter_name = 'gray'
     # img_filtered = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    img_filtered = img[:, :, 2]
-    filter_name = 'red'
+    img_filtered = img[:, :, 0]
+    filter_name = 'blue'
+    # img_filtered = bgr2luma(img)
+    # filter_name = 'luma'
+
     plt.imshow(img_filtered)
     cv2.waitKey()
     cv2.imshow(filter_name, cv2.resize(img_filtered, None, fx=0.8, fy=0.8))
+    cv2.imwrite(os.path.join(MEDIA_OUT_PATH, MEDIA_NAME_COLOURED), img_filtered)
+
+    # plt.imshow(img_filtered1)
+    # cv2.waitKey()
+    # cv2.imshow(filter_name1, cv2.resize(img_filtered1, None, fx=0.8, fy=0.8))
+
     ret, thresh = cv2.threshold(img_filtered, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # ret1, thresh1 = cv2.threshold(img_filtered1, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
     # noise removal
     kernel = np.ones((3, 3), np.uint8)
@@ -563,6 +585,7 @@ if MEDIA_TYPE == 'image':
     cv2.imshow('frame out', cv2.resize(frame_out, None, fx=0.8, fy=0.8))
     # cv2.imshow('colored frame', cv2.resize(colored_frame, None, fx=0.8, fy=0.8))
     cv2.waitKey(0)
+    cv2.imwrite(os.path.join(MEDIA_OUT_PATH, MEDIA_NAME), frame_out)
 
 elif MEDIA_TYPE == 'video':
     # Load video:
