@@ -11,19 +11,19 @@ import csv
 from matplotlib import pyplot as plt
 
 # # single frame:
-# MEDIA_PATH = '../res/monochromatic_illumination/2022-05-02 experiment1/'
+# MEDIA_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/image_division_uint8_after_normal/position3/'
 # MEDIA_SAVE_PATH = '../res/monochromatic_illumination/2022-05-02 experiment1/luminance/'
-# MEDIA_NAME = '430nm.png'
+# MEDIA_NAME = '430nm_700nm_clahe.png'
 # IMAGE_NAME_LUMA = '430nm_luma.png'
 # video:
 MEDIA_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/position3/'
-# FILE_NAME = 'test_video1'
-LIGHTING_TYPE = 'white'             ### CHANGE 4 EVERY TEST
-MEDIA_NAME = 'white.mkv'            ### CHANGE 4 EVERY TEST
-STATS_NAME = 'test2-pos3-covered_bone-large-rect.csv'            ### Don't change, data is added to the same excel
+LIGHTING_TYPE = '430nm'             ### CHANGE 4 EVERY TEST
+MEDIA_NAME = '430.mkv'            ### CHANGE 4 EVERY TEST
+STATS_NAME = 'test2-pos3-covered_bone-clahe.csv'            ### Don't change, data is added to the same excel
 NB_FRAME_SKIP = 2
 RECT_DISPLAY = True
-IS_SAVE_STATS = True
+IS_SAVE_STATS = False
+IS_CLAHE = True         # is perform CLAHE equalization
 
 
 class Position:
@@ -89,10 +89,16 @@ if __name__ == "__main__":
     # # image:
     # frame = cv2.imread(os.path.join(MEDIA_PATH, MEDIA_NAME))
     # # cv2.imshow('original', frame)
-    # frame_luma = bgr2luma(frame)
-    # # # average RGB
-    # # frame_average = np.mean(frame, 2)
-    # # cv2.imwrite(os.path.join(IMAGE_SAVE_PATH, IMAGE_NAME_LUMA), frame_luma)
+    # # frame_luma = bgr2luma(frame)
+    # # Take desired rectangles for bone & dura:
+    # rect_bone = frame[bone_rect.start_pos.x:bone_rect.end_pos.x, bone_rect.start_pos.y:bone_rect.end_pos.y, 0]
+    # rect_dura = frame[dura_rect.start_pos.x:dura_rect.end_pos.x, dura_rect.start_pos.y:dura_rect.end_pos.y, 0]
+    # bone_mean = np.mean(rect_bone)
+    # dura_mean = np.mean(rect_dura)
+
+    # # average RGB
+    # frame_average = np.mean(frame, 2)
+    # cv2.imwrite(os.path.join(IMAGE_SAVE_PATH, IMAGE_NAME_LUMA), frame_luma)
 
     # Load video:
     cap = cv2.VideoCapture(os.path.join(MEDIA_PATH, MEDIA_NAME))
@@ -106,20 +112,24 @@ if __name__ == "__main__":
                 print(frame_counter)
                 frame_luma = bgr2luma(frame)
 
+                if IS_CLAHE:
+                    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20, 20))
+                    frame_luma = clahe.apply(np.uint8(np.copy(frame_luma)))
+
                 # Take desired rectangles for bone & dura:
                 rect_bone = frame_luma[bone_rect.start_pos.x:bone_rect.end_pos.x, bone_rect.start_pos.y:bone_rect.end_pos.y]
                 rect_dura = frame_luma[dura_rect.start_pos.x:dura_rect.end_pos.x, dura_rect.start_pos.y:dura_rect.end_pos.y]
 
                 if frame_counter == 0 and RECT_DISPLAY:
                     # Display rectangles
-                    frame_rects = np.copy(frame)
+                    frame_rects = np.copy(frame_luma)
                     cv2.rectangle(frame_rects, tuple(reversed(bone_rect.start_pos())), tuple(reversed(bone_rect.end_pos())), (255, 0, 0), thickness=2)
                     cv2.rectangle(frame_rects, tuple(reversed(dura_rect.start_pos())), tuple(reversed(dura_rect.end_pos())), (255, 0, 0), thickness=2)
                     cv2.imshow('frame_rects', frame_rects)
 
-                    # Print rectangles
-                    cv2.imshow('bone', cv2.resize(np.uint8(rect_bone), None, fx=10, fy=10))
-                    cv2.imshow('dura', cv2.resize(rect_dura, None, fx=10, fy=10))
+                    # # Print rectangles
+                    # cv2.imshow('bone', cv2.resize(np.uint8(rect_bone), None, fx=10, fy=10))
+                    # cv2.imshow('dura', cv2.resize(rect_dura, None, fx=10, fy=10))
                     cv2.waitKey(0)
 
                     # # Print rectangles
