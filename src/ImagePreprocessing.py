@@ -19,10 +19,10 @@ logger.setLevel(logging.DEBUG)
 
 MEDIA_TYPE = 'image'                            # 'image' or 'video'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Dreal-mounted camera/Dreal-mounted/cropped/frame15654.jpg'
-MEDIA_PATH = '../res/monochromatic_illumination/2022-05-02 experiment1/700nm.png'
-MEDIA_NAME = '700nm_watershed_blue.png'
-MEDIA_NAME_COLOURED = '700nm_blue.png'
-MEDIA_OUT_PATH = '../res/monochromatic_illumination/2022-05-02 experiment1/watershed_blue'
+MEDIA_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/image_division_uint8_after_normal/position3/430nm_700nm.png'
+MEDIA_NAME = '430_700_divide_clahe_watershed.png'
+MEDIA_NAME_COLOURED = '430_700_divide.png'
+MEDIA_OUT_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/watershed/position3/'
 
 # MEDIA_TYPE = 'video'                          # 'image' or 'video'
 # MEDIA_PATH ='C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Media/210829 animal carevature_CASE0005 Robotic/Millgram/Foraminotomy - short.mp4'
@@ -42,6 +42,7 @@ KERNEL_MORPH = np.ones((21, 21), np.uint8)      # kernel for morphology close & 
 # HSV_MAX = np.asarray((179, 255, 255))
 
 IS_HSV_THRESH = False
+IS_CANNY = False
 IS_WATERSHED = True
 IS_WATERSHED_SEPARATION = False
 IS_REGION_GROWING = False                       # boolean if to apply region growing or not
@@ -50,13 +51,13 @@ IS_REDO_MERGING = False
 IMG_COLOR = 1
 IMG_GRAY = 0
 HOMOGENEITY_THRESHOLD = 0.75
-MIN_SIZE_REGION = 2000
+MIN_SIZE_REGION = 50
 MAX_SIZE_REGION = 100000
 REGION_LABELS_FILE = 'labels.npy'
 REGION_NB_LABELS_FILE = 'nb_labels.npy'
 REGION_MERGED_LABEL_PXL_FILE = 'merged_labels.npy'
 REGION_MERGED_LABELS_FILE = 'merged_label_list.npy'
-DISTANCE_THRESH = 20                            # maximum distance between objects for merging
+DISTANCE_THRESH = 10                            # maximum distance between objects for merging
 
 
 def exit_programme():
@@ -266,6 +267,7 @@ def apply_growing_n_merge_OLD(img, img_type):
 
     # apply region growing & merging of close regions together
     if IS_REDO_GROWING:
+        print('redo growing')
         # UNCOMMENT to compute region growing
         # do region growing to label each region in final image]
         # on HSV image
@@ -275,11 +277,13 @@ def apply_growing_n_merge_OLD(img, img_type):
         np.save(REGION_LABELS_FILE, labeled_pxl)
         np.save(REGION_NB_LABELS_FILE, nb_labels)
         # exit_programme()
+
     else:
         # load region growing arrays
         labeled_pxl = np.load(REGION_LABELS_FILE)
         nb_labels = np.load(REGION_NB_LABELS_FILE)
     if IS_REDO_MERGING:
+        print('redo merging')
         merged_labeled_pxl, merged_label_list = merge_regions(labeled_pxl, nb_labels, img)
         np.save(REGION_MERGED_LABEL_PXL_FILE, merged_labeled_pxl)
         np.save(REGION_MERGED_LABELS_FILE, merged_label_list)
@@ -290,6 +294,7 @@ def apply_growing_n_merge_OLD(img, img_type):
 
     # display each label
     for current_label in np.unique(labeled_pxl):
+        print('display regions')
         current_mask_region = cv2.inRange(labeled_pxl, int(current_label), int(current_label))
         nb_pxl = np.count_nonzero(current_mask_region)
         print('nb pxls', nb_pxl)
@@ -365,13 +370,15 @@ def watershed(img):
     # img_filtered = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # filter_name = 'gray'
     # img_filtered = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    img_filtered = img[:, :, 0]
-    filter_name = 'blue'
+    # img_filtered = img[:, :, 2]
+    # filter_name = 'red'
+    img_filtered = np.uint8(img[:, :, 0])
+    filter_name = 'original'
     # img_filtered = bgr2luma(img)
     # filter_name = 'luma'
 
-    plt.imshow(img_filtered)
-    cv2.waitKey()
+    # plt.imshow(img_filtered)
+    # cv2.waitKey()
     cv2.imshow(filter_name, cv2.resize(img_filtered, None, fx=0.8, fy=0.8))
     cv2.imwrite(os.path.join(MEDIA_OUT_PATH, MEDIA_NAME_COLOURED), img_filtered)
 
@@ -389,7 +396,8 @@ def watershed(img):
     sure_bg = cv2.dilate(opening, kernel, iterations=3)
     # Finding sure foreground area
     dist_transform = cv2.erode(opening, kernel, iterations=3)
-    ret, sure_fg = cv2.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
+    # ret, sure_fg = cv2.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
+    ret, sure_fg = cv2.threshold(dist_transform, 0.9 * dist_transform.max(), 255, 0)
     # Finding unknown region
     sure_fg = np.uint8(sure_fg)
     unknown = cv2.subtract(sure_bg, sure_fg)
@@ -552,6 +560,7 @@ cv2.waitKey(0)
 if MEDIA_TYPE == 'image':
     # load image
     frame = cv2.imread(MEDIA_PATH)
+    # frame = frame.flatten()
 
     # canny_filter(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
     # canny_filter(frame[:, :, 1])
@@ -566,14 +575,18 @@ if MEDIA_TYPE == 'image':
     #     cap.release()
     #     out.release()
     #     break
+    if IS_CANNY:
+        canny_filter(frame)
+
     if IS_WATERSHED:
         frame_out, colored_frame = watershed_n_post_process(frame)
 
     if IS_REGION_GROWING:
         # region growing
-        # frame = frame[:, :, 1]
+        frame = np.uint8(frame[:, :, 0])
         # mask = apply_growing_n_merge(frame, IMG_GRAY)
-        mask = apply_growing_n_merge_OLD(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
+        mask = apply_growing_n_merge_OLD(frame, IMG_GRAY)
+        # mask = apply_growing_n_merge_OLD(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV), IMG_COLOR)
         # mask = apply_growing_n_merge(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), IMG_COLOR)
         frame_out = cv2.bitwise_and(frame, frame, mask=mask)
         # frame_grown = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_not(mask))
