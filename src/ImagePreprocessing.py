@@ -19,9 +19,9 @@ logger.setLevel(logging.DEBUG)
 
 MEDIA_TYPE = 'image'                            # 'image' or 'video'
 # MEDIA_PATH = '../res/surgery_images/210829 animal carevature_CASE0005 Robotic/Dreal-mounted camera/Dreal-mounted/cropped/frame15654.jpg'
-MEDIA_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/image_division_uint8_after_normal/position3/430nm_700nm.png'
-MEDIA_NAME = '430_700_divide_clahe_watershed.png'
-MEDIA_NAME_COLOURED = '430_700_divide.png'
+MEDIA_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/luma/position3/430nm.png'
+MEDIA_NAME = '430nm_watershed.png'
+# MEDIA_NAME_COLOURED = '430_700_divide.png'
 MEDIA_OUT_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/watershed/position3/'
 
 # MEDIA_TYPE = 'video'                          # 'image' or 'video'
@@ -380,7 +380,7 @@ def watershed(img):
     # plt.imshow(img_filtered)
     # cv2.waitKey()
     cv2.imshow(filter_name, cv2.resize(img_filtered, None, fx=0.8, fy=0.8))
-    cv2.imwrite(os.path.join(MEDIA_OUT_PATH, MEDIA_NAME_COLOURED), img_filtered)
+    # cv2.imwrite(os.path.join(MEDIA_OUT_PATH, MEDIA_NAME_COLOURED), img_filtered)
 
     # plt.imshow(img_filtered1)
     # cv2.waitKey()

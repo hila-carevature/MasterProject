@@ -7,9 +7,11 @@ import cv2
 import os
 from matplotlib import pyplot as plt
 
-MEDIA_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/luma/position3/700nm.png'
-MEDIA_SAVE_NAME1 = '700nm_qualHist.png'
-MEDIA_SAVE_NAME2 = '700nm_CLAHE.png'
+MEDIA_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/position3/430nm.png'
+MEDIA_SAVE_NAME2 = '430nm_CLAHE2.0_20_20.png'
+# MEDIA_SAVE_NAME1 = '430nm_qualHist.png'
+CLAHE_CLIP_LIMIT = 2.0
+CLAHE_GRID_SIZE = (20, 20)
 MEDIA_SAVE_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/luma/position3/'
 
 
@@ -31,29 +33,29 @@ if __name__ == "__main__":
     # plt.show()
 
 
-    # Simple Histogram Equalization
-    image_equ = cv2.equalizeHist(np.uint8(image_luma))
-    cv2.imshow('equal Simple Histogram', image_equ)
+    # # Simple Histogram Equalization
+    # image_equ = cv2.equalizeHist(np.uint8(image_luma))
+    # cv2.imshow('equal Simple Histogram', image_equ)
 
 
     # CLAHE Contrast Limited Adaptive Histogram Equalization
     # create a CLAHE object (Arguments are optional).
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe = cv2.createCLAHE(clipLimit=CLAHE_CLIP_LIMIT, tileGridSize=CLAHE_GRID_SIZE)
     image_clahe = clahe.apply(np.uint8(image_luma))
     cv2.imshow('CLAHE', image_clahe)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    plt.hist(image_luma.flatten(), 256, [0, 256], color='r', alpha=0.5)
-    plt.hist(image_equ.flatten(), 256, [0, 256], color='g', alpha=0.5)
-    plt.hist(image_clahe.flatten(), 256, [0, 256], color='b', alpha=0.5)
-    plt.xlim([0, 256])
-    plt.legend(('original', 'simple', 'CLAHE'))
-    plt.title('Histogram comparison after different equalizations')
-    plt.xlabel('Intensity Value')
-    plt.ylabel('Pixel Count')
-    plt.show()
+    # plt.hist(image_luma.flatten(), 256, [0, 256], color='r', alpha=0.5)
+    # plt.hist(image_equ.flatten(), 256, [0, 256], color='g', alpha=0.5)
+    # plt.hist(image_clahe.flatten(), 256, [0, 256], color='b', alpha=0.5)
+    # plt.xlim([0, 256])
+    # plt.legend(('original', 'simple', 'CLAHE'))
+    # plt.title('Histogram comparison after different equalizations')
+    # plt.xlabel('Intensity Value')
+    # plt.ylabel('Pixel Count')
+    # plt.show()
 
     # cv2.imwrite(os.path.join(MEDIA_SAVE_PATH, MEDIA_SAVE_NAME1), image_equ)
-    # cv2.imwrite(os.path.join(MEDIA_SAVE_PATH, MEDIA_SAVE_NAME2), image_clahe)
+    cv2.imwrite(os.path.join(MEDIA_SAVE_PATH, MEDIA_SAVE_NAME2), image_clahe)

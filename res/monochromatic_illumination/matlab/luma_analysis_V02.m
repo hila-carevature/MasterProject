@@ -2,7 +2,7 @@
 
 % data: (sample x features): features = [test_type, mean_tissue1, mean_tissue2]
 % load lumavaluesa.mat
-raw_data = readtable('..\2022-06-01 Experiment 2\position1\test2-pos1.csv');
+% raw_data = readtable('..\2022-06-01 Experiment 2\position3\test2-pos3-covered_bone-clahe.csv');
 
 % remove heading rows : lighting_type = NaN
 % raw_data(isnan(raw_data.lighting_type), :) = [];
@@ -48,7 +48,7 @@ set(gca,'xticklabel', lighting_types);
 ylabel("Bone-Dura Contrast")
 xlabel("Illumination type")
 % xlim([0 1100]);
-title("Bone-Dura Contrast vs illumination type - Test 2: Position 1")
+title("Bone-Dura Contrast vs illumination - Test 2: Position 3 CLAHE")
 
 % absolute value
 figure;
@@ -57,7 +57,7 @@ set(gca,'xticklabel', lighting_types);
 ylabel("Bone-Dura Contrast Absolute")
 xlabel("Illumination type")
 % xlim([0 1100]);
-title("Bone-Dura Contrast vs illumination type - Test 2: Position 1")
+title("Bone-Dura Contrast vs illumination - Test 2: Position 3 CLAHE")
 
 %% Build mean & std array for plotting errorbar Mean-luminance vs wavelength
 
