@@ -16,14 +16,17 @@ from matplotlib import pyplot as plt
 # MEDIA_NAME = '430nm_700nm_clahe.png'
 # IMAGE_NAME_LUMA = '430nm_luma.png'
 # video:
-MEDIA_PATH = '../res/monochromatic_illumination/2022-06-01 Experiment 2/position3/'
+MEDIA_PATH = '../res/monochromatic_illumination/2022-06-14 Experiment 3/'
+MEDIA_SAVE_PATH = '../res/monochromatic_illumination/2022-06-14 Experiment 3/luma/'
 LIGHTING_TYPE = '430nm'             ### CHANGE 4 EVERY TEST
+SAVE_NAME = '430nm.png'             ### CHANGE 4 EVERY TEST
+# MEDIA_NAME = '430.mkv'            ### CHANGE 4 EVERY TEST
 MEDIA_NAME = '430.mkv'            ### CHANGE 4 EVERY TEST
-STATS_NAME = 'test2-pos3-covered_bone-clahe.csv'            ### Don't change, data is added to the same excel
+STATS_NAME = 'contrast_summary_pos3.csv'            ### Don't change, data is added to the same excel
 NB_FRAME_SKIP = 2
 RECT_DISPLAY = True
 IS_SAVE_STATS = False
-IS_CLAHE = True         # is perform CLAHE equalization
+IS_CLAHE = False         # is perform CLAHE equalization
 
 
 class Position:
@@ -60,6 +63,11 @@ dura_rect = Rectangle(460, 300, 85, 85)
 # bone_rect = Rectangle(348, 333, 60, 60)         # rectangle pos & dimensions in GIMP programme
 # dura_rect = Rectangle(528, 157, 60, 60)
 
+
+# # Experiment 1:
+# bone_rect = Rectangle(680, 385, 70, 70)         # rectangle pos & dimensions in GIMP programme
+# dura_rect = Rectangle(604, 265, 70, 70)
+
 '''-------------------------------Main code--------------------------------------------------------'''
 
 # def srgb_to_linsrgb (srgb):
@@ -86,19 +94,35 @@ if __name__ == "__main__":
     frame_counter = 0
     sample_counter = 0
 
-    # # image:
-    # frame = cv2.imread(os.path.join(MEDIA_PATH, MEDIA_NAME))
-    # # cv2.imshow('original', frame)
-    # # frame_luma = bgr2luma(frame)
-    # # Take desired rectangles for bone & dura:
-    # rect_bone = frame[bone_rect.start_pos.x:bone_rect.end_pos.x, bone_rect.start_pos.y:bone_rect.end_pos.y, 0]
-    # rect_dura = frame[dura_rect.start_pos.x:dura_rect.end_pos.x, dura_rect.start_pos.y:dura_rect.end_pos.y, 0]
-    # bone_mean = np.mean(rect_bone)
-    # dura_mean = np.mean(rect_dura)
+    '''
+    # image:
+    frame = cv2.imread(os.path.join(MEDIA_PATH, MEDIA_NAME))
+    frame_luma = bgr2luma(frame)
+
+    # Take desired rectangles for bone & dura:
+    rect_bone = frame_luma[bone_rect.start_pos.x:bone_rect.end_pos.x, bone_rect.start_pos.y:bone_rect.end_pos.y]
+    rect_dura = frame_luma[dura_rect.start_pos.x:dura_rect.end_pos.x, dura_rect.start_pos.y:dura_rect.end_pos.y]
+    stats = np.append(stats, [[LIGHTING_TYPE, np.mean(rect_bone), np.mean(rect_dura)]], axis=0)
+
+    frame_rects = np.copy(frame_luma)
+    cv2.rectangle(frame_rects, tuple(reversed(bone_rect.start_pos())), tuple(reversed(bone_rect.end_pos())),
+                  (255, 0, 0), thickness=2)
+    cv2.rectangle(frame_rects, tuple(reversed(dura_rect.start_pos())), tuple(reversed(dura_rect.end_pos())),
+                  (255, 0, 0), thickness=2)
+    cv2.imshow('frame', frame)
+    cv2.imshow('frame_luma', np.uint8(frame_luma))
+    cv2.imshow('frame_rects', np.uint8(frame_rects))
+    cv2.waitKey(0)
 
     # # average RGB
     # frame_average = np.mean(frame, 2)
     # cv2.imwrite(os.path.join(IMAGE_SAVE_PATH, IMAGE_NAME_LUMA), frame_luma)
+
+    if IS_SAVE_STATS:
+        with open(os.path.join(MEDIA_PATH, STATS_NAME), 'a', newline='') as csvfile:
+            my_writer = csv.writer(csvfile, delimiter=",")
+            my_writer.writerows(stats)
+    '''
 
     # Load video:
     cap = cv2.VideoCapture(os.path.join(MEDIA_PATH, MEDIA_NAME))
@@ -110,11 +134,16 @@ if __name__ == "__main__":
         if ret:
             if frame_counter % NB_FRAME_SKIP == 0:
                 print(frame_counter)
-                frame_luma = bgr2luma(frame)
+
+                # frame_luma = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                # frame_luma = frame[:, :, 2]
+                frame_luma = np.uint8(bgr2luma(frame))
 
                 if IS_CLAHE:
                     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(20, 20))
                     frame_luma = clahe.apply(np.uint8(np.copy(frame_luma)))
+
 
                 # Take desired rectangles for bone & dura:
                 rect_bone = frame_luma[bone_rect.start_pos.x:bone_rect.end_pos.x, bone_rect.start_pos.y:bone_rect.end_pos.y]
@@ -151,11 +180,14 @@ if __name__ == "__main__":
             frame_counter += 1
         else:
             break
+
+
     if IS_SAVE_STATS:
-        with open(os.path.join(MEDIA_PATH, STATS_NAME), 'a', newline='') as csvfile:
+        with open(os.path.join(MEDIA_SAVE_PATH, STATS_NAME), 'a', newline='') as csvfile:
             my_writer = csv.writer(csvfile, delimiter=",")
             my_writer.writerows(stats)
 
-    print('sample counter', sample_counter)
+    #print('sample counter', sample_counter)
     cv2.destroyAllWindows()
+
 

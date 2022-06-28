@@ -2,7 +2,7 @@
 
 % data: (sample x features): features = [test_type, mean_tissue1, mean_tissue2]
 % load lumavaluesa.mat
-% raw_data = readtable('..\2022-06-01 Experiment 2\position3\test2-pos3-covered_bone-clahe.csv');
+% raw_data = readtable('..\2022-06-01 Experiment 2\contrast_summary\contrast_summary_pos3.csv');
 
 % remove heading rows : lighting_type = NaN
 % raw_data(isnan(raw_data.lighting_type), :) = [];
@@ -26,10 +26,10 @@ for i=1:length(lighting_types)
     % remove abundant data
     data_temp(max_nb_datapoints+1:end, :) = [];
     new_data(:, :, i) = data_temp;
-    p_values = [p_values, anova1(new_data(:, :, i), tissue_types, 'on')];
-    title(['Luminance at' lighting_types(i)])
-    ylabel('Luminance')
-    xlabel('Tissue type')
+%     p_values = [p_values, anova1(new_data(:, :, i), tissue_types, 'on')];
+%     title(['Luminance at' lighting_types(i)])
+%     ylabel('Luminance')
+%     xlabel('Tissue type')
 end
 
 %% Build mean & std array 
@@ -47,7 +47,7 @@ bar(contrast, 'grouped');
 set(gca,'xticklabel', lighting_types);
 ylabel("Bone-Dura Contrast")
 xlabel("Illumination type")
-% xlim([0 1100]);
+ylim([0 0.45]);
 title("Bone-Dura Contrast vs illumination - Test 2: Position 3 CLAHE")
 
 % absolute value
@@ -56,8 +56,8 @@ bar(abs(contrast), 'grouped');
 set(gca,'xticklabel', lighting_types);
 ylabel("Bone-Dura Contrast Absolute")
 xlabel("Illumination type")
-% xlim([0 1100]);
-title("Bone-Dura Contrast vs illumination - Test 2: Position 3 CLAHE")
+ylim([0 0.45]);
+title("Bone-Dura Contrast vs illumination - Test 2")
 
 %% Build mean & std array for plotting errorbar Mean-luminance vs wavelength
 
@@ -84,4 +84,16 @@ xlabel("Illumination type")
 % xlim([0 1100]);
 title("Luminance vs illumination type")
 legend(tissue_types)
+
+
+%%
+mean_all = reshape(new_data, length(tissue_types), length(lighting_types));
+contrast = diff(mean_all) ./ sum(mean_all);
+figure;
+bar(contrast, 'grouped');
+set(gca,'xticklabel', lighting_types);
+ylabel("Bone-Dura Contrast Absolute")
+xlabel("Illumination type")
+ylim([0 0.45]);
+title("Bone-Dura Contrast vs illumination - Test 1")
 

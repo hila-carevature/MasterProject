@@ -2,8 +2,8 @@
 import cv2
 import os
 
-VIDEO_PATH = 'C:/Users/User/Dropbox (Carevature Medical)/Robotic Decompression/Imaging/Endoscopes/MiiS/Industrial Design/Media/Surgical Cases/Harel/Lumbar MIS Decompression case 181226 Harel RAW.mp4'
-IMAGE_SAVE_PATH = '../res/surgery_images/Surgical Cases/Harel/Lumbar MIS Decompression case 181226 Harel RAW'
+VIDEO_PATH = '../res/monochromatic_illumination/2022-06-15 Experiment 4/white.mkv'
+IMAGE_SAVE_PATH = '../res/monochromatic_illumination/2022-06-15 Experiment 4/430'
 
 
 # Load video:
